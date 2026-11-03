@@ -35,7 +35,7 @@ import {
   X,
 } from 'lucide-react';
 import { BETA_PRICE, BETA_SLOTS_TOTAL, CONTACT_VALIDATORS, OFFICIAL_PRICE, PRODUCT_NAME, ULTIMATE_PRICE } from '../shared/config.js';
-import { api, useMe } from './lib/api.js';
+import { api, useMe, useSlots } from './lib/api.js';
 import { DevSignIn, GoogleSignInButton } from './SignIn.jsx';
 import { Container, CopyField, GlobalStyles, Logo, PillButton, formatVnd, inputClass } from './ui.jsx';
 
@@ -44,7 +44,7 @@ import { Container, CopyField, GlobalStyles, Logo, PillButton, formatVnd, inputC
 /* ------------------------------------------------------------------ */
 
 // Prices and slot totals live in shared/config.js so the API charges the same amounts.
-const BETA_SLOTS_TAKEN = 63;
+// Slots taken are counted from paid orders (GET /api/stats).
 
 // Fill in to render a scannable VietQR code in the checkout modal.
 // bankId uses VietQR bank codes, e.g. "vcb", "mb", "tcb", "acb".
@@ -1184,7 +1184,10 @@ function LockedCard({ title, price, features, blur, opacity, lockTitle, lockSub 
 }
 
 function Pricing({ onCheckout }) {
-  const slotsLeft = BETA_SLOTS_TOTAL - BETA_SLOTS_TAKEN;
+  const slotsTaken = useSlots();
+  const known = slotsTaken !== null;
+  const slotsLeft = known ? Math.max(0, BETA_SLOTS_TOTAL - slotsTaken) : null;
+  const soldOut = slotsLeft === 0;
   const savePct = Math.round((1 - BETA_PRICE / ULTIMATE_PRICE) * 100);
 
   return (
@@ -1204,7 +1207,7 @@ function Pricing({ onCheckout }) {
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-70" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-accent" />
             </span>
-            Còn {slotsLeft}/{BETA_SLOTS_TOTAL} slot Beta
+            {soldOut ? 'Đã hết slot Beta' : known ? `Còn ${slotsLeft}/${BETA_SLOTS_TOTAL} slot Beta` : `Giới hạn ${BETA_SLOTS_TOTAL} slot Beta`}
           </span>
         </Reveal>
 
@@ -1228,10 +1231,11 @@ function Pricing({ onCheckout }) {
                 <p className="mt-1 text-base text-mute">Thanh toán 1 lần duy nhất</p>
 
                 <div className="mt-6 h-1.5 overflow-hidden rounded-full bg-chip">
-                  <div className="h-full rounded-full bg-white" style={{ width: `${(BETA_SLOTS_TAKEN / BETA_SLOTS_TOTAL) * 100}%` }} />
+                  <div className="h-full rounded-full bg-white" style={{ width: `${(Math.min(slotsTaken ?? 0, BETA_SLOTS_TOTAL) / BETA_SLOTS_TOTAL) * 100}%` }} />
                 </div>
                 <p className="mt-2 text-sm text-mute">
-                  Đã nhận {BETA_SLOTS_TAKEN}/{BETA_SLOTS_TOTAL} slot · Giá tăng lên {formatVnd(OFFICIAL_PRICE)} khi hết slot
+                  {known ? `Đã nhận ${Math.min(slotsTaken, BETA_SLOTS_TOTAL)}/${BETA_SLOTS_TOTAL} slot` : `${BETA_SLOTS_TOTAL} slot đầu tiên`} · Giá tăng lên{' '}
+                  {formatVnd(OFFICIAL_PRICE)} khi hết slot
                 </p>
 
                 <div className="mt-6 rounded-[24px] border border-line bg-inner p-[18px]">
@@ -1242,8 +1246,8 @@ function Pricing({ onCheckout }) {
                   </p>
                 </div>
 
-                <PillButton className="mt-6 w-full" onClick={onCheckout}>
-                  Nhận Slot Beta Ngay — {formatVnd(BETA_PRICE)}
+                <PillButton className="mt-6 w-full" onClick={onCheckout} disabled={soldOut}>
+                  {soldOut ? 'Đã hết slot Beta' : `Nhận Slot Beta Ngay — ${formatVnd(BETA_PRICE)}`}
                 </PillButton>
 
                 <div className="mt-8">

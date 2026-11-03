@@ -43,3 +43,14 @@ export function useMe() {
   }, [reload]);
   return { me, error, reload };
 }
+
+// Paid Beta slots, for the pricing counter. `slotsTaken` is null until loaded (or if the API is unreachable).
+export function useSlots() {
+  const [slotsTaken, setSlotsTaken] = useState(null);
+  useEffect(() => {
+    api('/stats')
+      .then((s) => setSlotsTaken(s.slotsTaken))
+      .catch(() => {});
+  }, []);
+  return slotsTaken;
+}

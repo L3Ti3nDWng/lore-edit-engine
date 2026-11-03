@@ -1,7 +1,8 @@
-import { BETA_PRICE, CONTACT_METHOD_IDS, CONTACT_VALIDATORS } from '../../../shared/config.js';
+import { BETA_PRICE, BETA_SLOTS_TOTAL, CONTACT_METHOD_IDS, CONTACT_VALIDATORS } from '../../../shared/config.js';
 import { requireUser } from '../../../server/auth.js';
 import { HttpError, json, now, readJson } from '../../../server/http.js';
 import { newOrderCode, publicOrder } from '../../../server/orders.js';
+import { slotsTaken } from '../../../server/slots.js';
 
 // Creates the signed-in user's Beta order, or refreshes their open one so the
 // transfer code they may already have copied stays valid.
@@ -23,6 +24,10 @@ export async function onRequestPost(context) {
   const open = await env.DB.prepare("SELECT * FROM orders WHERE user_id = ? AND status = 'pending' ORDER BY created_at DESC LIMIT 1")
     .bind(user.id)
     .first();
+  // Someone who already started an order may still finish it; new orders stop at the cap.
+  if (!open && (await slotsTaken(env)) >= BETA_SLOTS_TOTAL) {
+    throw new HttpError(409, 'sold_out', 'Đã hết slot Beta. Cảm ơn bạn đã quan tâm!');
+  }
   if (open) {
     await env.DB.prepare('UPDATE orders SET name = ?, contact_method = ?, contact = ? WHERE code = ?').bind(name, contactMethod, contact, open.code).run();
     return json({ order: publicOrder({ ...open, name, contact_method: contactMethod, contact }) });
