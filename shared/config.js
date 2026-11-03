@@ -4,7 +4,10 @@
 export const BETA_PRICE = 349000;
 export const OFFICIAL_PRICE = 479000;
 export const ULTIMATE_PRICE = 979000;
-export const BETA_SLOTS_TOTAL = 100;
+export const BETA_SLOTS_TOTAL = 50;
+// Slots shown as already taken before any real order counts (7 → "Còn 43/50").
+// They also count toward the cap, so only TOTAL − RESERVED slots can actually be sold.
+export const BETA_SLOTS_RESERVED = 7;
 
 export const PRODUCT_NAME = 'Phiên Bản Thử Nghiệm (Beta Test)';
 
