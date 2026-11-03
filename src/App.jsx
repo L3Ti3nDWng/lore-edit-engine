@@ -9,7 +9,6 @@ import {
   ChevronRight,
   Clapperboard,
   Clock3,
-  Copy,
   Cpu,
   Dna,
   Film,
@@ -31,18 +30,20 @@ import {
   Sparkles,
   Subtitles,
   Terminal,
+  UserRound,
   Wand2,
   X,
 } from 'lucide-react';
+import { BETA_PRICE, BETA_SLOTS_TOTAL, CONTACT_VALIDATORS, OFFICIAL_PRICE, PRODUCT_NAME, ULTIMATE_PRICE } from '../shared/config.js';
+import { api, useMe } from './lib/api.js';
+import { DevSignIn, GoogleSignInButton } from './SignIn.jsx';
+import { Container, CopyField, GlobalStyles, Logo, PillButton, formatVnd, inputClass } from './ui.jsx';
 
 /* ------------------------------------------------------------------ */
 /* Business config — edit these before going live                      */
 /* ------------------------------------------------------------------ */
 
-const BETA_PRICE = 349000;
-const OFFICIAL_PRICE = 479000;
-const ULTIMATE_PRICE = 979000;
-const BETA_SLOTS_TOTAL = 100;
+// Prices and slot totals live in shared/config.js so the API charges the same amounts.
 const BETA_SLOTS_TAKEN = 63;
 
 // Fill in to render a scannable VietQR code in the checkout modal.
@@ -53,9 +54,6 @@ const PAYMENT_CONFIG = {
   accountNumber: '',
   accountName: '',
 };
-
-// Optional: POST endpoint that receives { orderCode, name, contactMethod, contact, amount }.
-const ORDER_WEBHOOK_URL = '';
 
 /* ------------------------------------------------------------------ */
 /* Media (free Unsplash photos, stored in /public/media)               */
@@ -233,7 +231,7 @@ const CONTACT_METHODS = [
     label: 'Email',
     icon: Mail,
     placeholder: 'ban@email.com',
-    validate: (v) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v),
+    validate: CONTACT_VALIDATORS.email,
     error: 'Email chưa đúng định dạng.',
   },
   {
@@ -241,7 +239,7 @@ const CONTACT_METHODS = [
     label: 'Zalo',
     icon: MessageCircle,
     placeholder: '09xx xxx xxx',
-    validate: (v) => /^(\+?84|0)\d{9}$/.test(v.replace(/[\s.-]/g, '')),
+    validate: CONTACT_VALIDATORS.zalo,
     error: 'Số Zalo cần 10 chữ số, ví dụ 0912 345 678.',
   },
   {
@@ -249,7 +247,7 @@ const CONTACT_METHODS = [
     label: 'Discord',
     icon: Bot,
     placeholder: 'username',
-    validate: (v) => /^[a-z0-9_.]{2,32}$/i.test(v.trim().replace(/^@/, '')),
+    validate: CONTACT_VALIDATORS.discord,
     error: 'Tên Discord gồm 2–32 ký tự chữ, số, dấu chấm hoặc gạch dưới.',
   },
 ];
@@ -257,8 +255,6 @@ const CONTACT_METHODS = [
 /* ------------------------------------------------------------------ */
 /* Helpers & hooks                                                     */
 /* ------------------------------------------------------------------ */
-
-const formatVnd = (n) => `${n.toLocaleString('vi-VN')}đ`;
 
 const scrollToId = (id) => {
   const el = document.getElementById(id);
@@ -335,27 +331,6 @@ function hashString(str) {
 /* Global styles (keyframes)                                           */
 /* ------------------------------------------------------------------ */
 
-function GlobalStyles() {
-  return (
-    <style>{`
-      @keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-      @keyframes letterIn { from { opacity: 0; transform: translateY(40%); filter: blur(8px); } to { opacity: 1; transform: translateY(0); filter: blur(0); } }
-      @keyframes heroDrift { 0%, 100% { transform: scale(1.06) translate3d(0, 0, 0); } 50% { transform: scale(1.12) translate3d(-1%, -1.5%, 0); } }
-      @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); filter: blur(6px); } to { opacity: 1; transform: translateY(0); filter: blur(0); } }
-      @keyframes spin { to { transform: rotate(360deg); } }
-      @keyframes caret { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
-      @keyframes cursorMove { 0%, 100% { transform: translate(0, 0); } 40% { transform: translate(-96px, 6px); } 60% { transform: translate(-96px, 6px); } }
-      .anim-marquee { animation: marquee 40s linear infinite; }
-      .anim-letter { display: inline-block; animation: letterIn .7s cubic-bezier(.2,.8,.2,1) both; }
-      .anim-hero { animation: heroDrift 24s ease-in-out infinite; }
-      .anim-fade-up { animation: fadeUp .5s cubic-bezier(.2,.8,.2,1) both; }
-      .anim-spin { animation: spin 1s linear infinite; }
-      .anim-caret { animation: caret 1s steps(1) infinite; }
-      .anim-cursor { animation: cursorMove 5s ease-in-out infinite; }
-    `}</style>
-  );
-}
-
 /* ------------------------------------------------------------------ */
 /* Primitives                                                          */
 /* ------------------------------------------------------------------ */
@@ -375,50 +350,12 @@ function Reveal({ children, className = '', delay = 0 }) {
   );
 }
 
-// Framer-style pill: label rolls up on hover.
-function PillButton({ children, variant = 'light', size = 'md', className = '', ...rest }) {
-  const styles =
-    variant === 'light' ? 'bg-white text-base' : 'border border-line bg-base text-white hover:border-line2';
-  const pad = size === 'sm' ? 'px-5 py-2.5' : size === 'lg' ? 'px-6 py-[14px]' : 'px-6 py-3';
-  return (
-    <button
-      type="button"
-      className={`group relative inline-flex items-center justify-center overflow-hidden rounded-full text-base font-medium tracking-tightish transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-base disabled:cursor-not-allowed disabled:opacity-60 ${styles} ${pad} ${className}`}
-      {...rest}
-    >
-      <span className="relative block overflow-hidden leading-[1.3]">
-        <span className="flex items-center justify-center gap-2 transition-transform duration-500 ease-[cubic-bezier(.2,.8,.2,1)] group-hover:-translate-y-full">
-          {children}
-        </span>
-        <span
-          aria-hidden="true"
-          className="absolute inset-0 flex translate-y-full items-center justify-center gap-2 transition-transform duration-500 ease-[cubic-bezier(.2,.8,.2,1)] group-hover:translate-y-0"
-        >
-          {children}
-        </span>
-      </span>
-    </button>
-  );
-}
-
 function Heading({ children, className = '' }) {
   return (
     <h2 className={`text-[32px] font-medium leading-[1.2] tracking-tightish text-white md:text-[36px] lg:text-[44px] ${className}`}>
       {children}
     </h2>
   );
-}
-
-function Logo({ size = 26 }) {
-  return (
-    <span className="font-script leading-[1.2] tracking-tightish text-white" style={{ fontSize: size }}>
-      Lore
-    </span>
-  );
-}
-
-function Container({ children, className = '' }) {
-  return <div className={`mx-auto w-full max-w-[1440px] px-5 md:px-10 ${className}`}>{children}</div>;
 }
 
 function PhotoCard({ image, className = '', overlay = 'bg-black/35', position = 'center', children }) {
@@ -441,7 +378,8 @@ function PhotoCard({ image, className = '', overlay = 'bg-black/35', position = 
 /* Navbar                                                              */
 /* ------------------------------------------------------------------ */
 
-function Navbar({ onCheckout }) {
+function Navbar({ onCheckout, me }) {
+  const accountLabel = me?.user ? 'Tài khoản' : 'Đăng nhập';
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
 
@@ -463,7 +401,7 @@ function Navbar({ onCheckout }) {
           <Logo />
         </a>
 
-        <div className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-8 lg:flex">
+        <div className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-6 lg:flex xl:gap-8">
           {NAV_LINKS.map((l) => (
             <a key={l.href} href={l.href} className="text-base tracking-[0.01em] text-white transition-opacity hover:opacity-60">
               {l.label}
@@ -471,7 +409,20 @@ function Navbar({ onCheckout }) {
           ))}
         </div>
 
-        <div className="hidden items-center gap-[30px] lg:flex">
+        <div className="hidden items-center gap-4 lg:flex xl:gap-[30px]">
+          <a
+            href="/account"
+            aria-label={accountLabel}
+            className="inline-flex items-center gap-2 text-base font-medium tracking-tightish text-white transition-opacity hover:opacity-60"
+          >
+            {me?.user?.avatarUrl ? (
+              <img src={me.user.avatarUrl} alt="" referrerPolicy="no-referrer" className="h-6 w-6 rounded-full border border-line2" />
+            ) : (
+              <UserRound className="h-4 w-4" />
+            )}
+            {/* Icon only until xl so it doesn't collide with the centered links. */}
+            <span className="hidden xl:inline">{accountLabel}</span>
+          </a>
           <button
             type="button"
             onClick={() => scrollToId('workflow')}
@@ -503,6 +454,9 @@ function Navbar({ onCheckout }) {
               {l.label}
             </a>
           ))}
+          <a href="/account" className="block border-b border-line py-4 text-lg text-white">
+            {accountLabel}
+          </a>
           <PillButton
             className="mt-6 w-full"
             onClick={() => {
@@ -1371,63 +1325,35 @@ function PatternQr({ seed }) {
   );
 }
 
-function CopyField({ label, value }) {
-  const [copied, setCopied] = useState(false);
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1600);
-    } catch {
-      setCopied(false);
-    }
-  };
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-2xl border border-line bg-inner px-4 py-2.5">
-      <div className="min-w-0">
-        <p className="text-xs text-mute">{label}</p>
-        <p className="truncate text-sm font-medium tracking-tightish text-white">{value || 'Đang cập nhật'}</p>
-      </div>
-      {value && (
-        <button
-          type="button"
-          onClick={copy}
-          className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-line2 bg-chip px-2.5 py-1 text-xs font-medium text-white transition-colors hover:border-white/40"
-          aria-label={`Sao chép ${label}`}
-        >
-          {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-          {copied ? 'Đã chép' : 'Chép'}
-        </button>
-      )}
-    </div>
-  );
-}
+const POLL_MS = 4000;
 
-const inputClass = (hasError) =>
-  `mt-2 w-full rounded-2xl border bg-inner px-4 py-3 text-base text-white outline-none transition-colors placeholder:text-mute/50 focus:border-line2 ${
-    hasError ? 'border-rose-400/60' : 'border-line'
-  }`;
-
-function CheckoutModal({ open, onClose }) {
+function CheckoutModal({ open, onClose, me, reloadMe }) {
   const [step, setStep] = useState('form');
   const [name, setName] = useState('');
-  const [method, setMethod] = useState('zalo');
+  const [method, setMethod] = useState('email');
   const [contact, setContact] = useState('');
   const [touched, setTouched] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [orderCode, setOrderCode] = useState('');
+  const [submitError, setSubmitError] = useState('');
+  const [order, setOrder] = useState(null);
   const firstFieldRef = useRef(null);
 
+  const user = me?.user;
   const methodCfg = CONTACT_METHODS.find((m) => m.id === method);
   const nameError = touched && name.trim().length < 2 ? 'Vui lòng nhập họ tên (ít nhất 2 ký tự).' : '';
   const contactError = touched && !methodCfg.validate(contact) ? methodCfg.error : '';
-  const transferNote = `LORE BETA ${orderCode}`;
+  const transferNote = order?.transferNote || '';
+  const amount = order?.amount || BETA_PRICE;
   const hasBank = Boolean(PAYMENT_CONFIG.bankId && PAYMENT_CONFIG.accountNumber);
   const qrUrl = hasBank
-    ? `https://img.vietqr.io/image/${PAYMENT_CONFIG.bankId}-${PAYMENT_CONFIG.accountNumber}-compact2.png?amount=${BETA_PRICE}&addInfo=${encodeURIComponent(
+    ? `https://img.vietqr.io/image/${PAYMENT_CONFIG.bankId}-${PAYMENT_CONFIG.accountNumber}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(
         transferNote
       )}&accountName=${encodeURIComponent(PAYMENT_CONFIG.accountName)}`
     : '';
+
+  // Which screen to show before the order form: sign in, already owned, or the form.
+  // A purchase that just completed keeps its own success screen.
+  const gate = !me ? 'loading' : !user ? 'auth' : me.entitled && step !== 'paid' ? 'owned' : null;
 
   useEffect(() => {
     if (!open) return undefined;
@@ -1443,41 +1369,69 @@ function CheckoutModal({ open, onClose }) {
     };
   }, [open, onClose]);
 
+  // Prefill from the Google account, or from the order the user already started.
+  useEffect(() => {
+    if (!open || !user) return;
+    const pending = me.orders.find((o) => o.status === 'pending');
+    setName((v) => v || pending?.name || user.name);
+    if (pending) {
+      setMethod(pending.contactMethod);
+      setContact(pending.contact);
+    } else {
+      setContact((v) => v || user.email);
+    }
+  }, [open, user, me]);
+
   useEffect(() => {
     if (open) return undefined;
     const t = setTimeout(() => {
       setStep('form');
       setTouched(false);
       setSubmitting(false);
+      setSubmitError('');
     }, 200);
     return () => clearTimeout(t);
   }, [open]);
 
+  // While the transfer is outstanding, poll until the SePay webhook (or an admin) marks it paid.
+  useEffect(() => {
+    if (!open || !order || order.status !== 'pending' || !['payment', 'done'].includes(step)) return undefined;
+    const id = setInterval(async () => {
+      try {
+        const { order: latest } = await api(`/orders/${order.code}`);
+        if (latest.status === 'paid') {
+          setOrder(latest);
+          setStep('paid');
+          reloadMe();
+        }
+      } catch {
+        // Transient network errors: keep polling.
+      }
+    }, POLL_MS);
+    return () => clearInterval(id);
+  }, [open, order, step, reloadMe]);
+
   const submit = async (e) => {
     e.preventDefault();
     setTouched(true);
+    setSubmitError('');
     if (name.trim().length < 2 || !methodCfg.validate(contact)) return;
     setSubmitting(true);
-    const code = `LB${Date.now().toString(36).slice(-4).toUpperCase()}${Math.random().toString(36).slice(2, 4).toUpperCase()}`;
-    if (ORDER_WEBHOOK_URL) {
-      try {
-        await fetch(ORDER_WEBHOOK_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ orderCode: code, name: name.trim(), contactMethod: method, contact: contact.trim(), amount: BETA_PRICE }),
-        });
-      } catch {
-        // Order still proceeds; the transfer note carries the order code for manual reconciliation.
-      }
+    try {
+      const res = await api('/orders', { method: 'POST', body: { name: name.trim(), contactMethod: method, contact: contact.trim() } });
+      setOrder(res.order);
+      setStep('payment');
+    } catch (err) {
+      if (err.code === 'already_paid') reloadMe();
+      setSubmitError(err.message);
+    } finally {
+      setSubmitting(false);
     }
-    setOrderCode(code);
-    setSubmitting(false);
-    setStep('payment');
   };
 
   if (!open) return null;
 
-  const stepIndex = { form: 0, payment: 1, done: 2 }[step];
+  const stepIndex = gate === 'owned' ? 3 : gate ? 0 : { form: 0, payment: 1, done: 1, paid: 3 }[step];
 
   return (
     <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-labelledby="checkout-title">
@@ -1517,8 +1471,45 @@ function CheckoutModal({ open, onClose }) {
 
         <div className="grid md:grid-cols-[1fr_280px]">
           <div className="p-6 sm:p-8">
-            {step === 'form' && (
+            {gate === 'loading' && (
+              <p className="flex items-center gap-2 text-sm text-mute">
+                <Loader2 className="h-4 w-4 animate-spin" /> Đang tải...
+              </p>
+            )}
+
+            {gate === 'auth' && (
+              <div className="anim-fade-up">
+                <h3 className="text-2xl font-medium tracking-tightish text-white">Đăng nhập để giữ slot</h3>
+                <p className="mt-2 text-base leading-[1.5] text-mute">
+                  Đơn hàng gắn với tài khoản Google của bạn. Sau khi thanh toán, bạn dùng chính tài khoản này để vào trang thành viên tải Skill và
+                  nhận bản cập nhật.
+                </p>
+                <GoogleSignInButton next="/?checkout=1" className="mt-6 w-full" />
+                <DevSignIn onDone={reloadMe} />
+              </div>
+            )}
+
+            {gate === 'owned' && (
+              <div className="anim-fade-up">
+                <span className="flex h-12 w-12 items-center justify-center rounded-full border border-line2 bg-chip">
+                  <CheckCircle2 className="h-6 w-6 text-accent" />
+                </span>
+                <h3 className="mt-5 text-2xl font-medium tracking-tightish text-white">Bạn đã sở hữu Skill</h3>
+                <p className="mt-2 text-base leading-[1.4] text-mute">Tài khoản {user.email} đã thanh toán. Vào trang thành viên để tải bản mới nhất.</p>
+                <PillButton className="mt-6 w-full" onClick={() => window.location.assign('/account')}>
+                  Vào trang thành viên <ArrowRight className="h-4 w-4" />
+                </PillButton>
+              </div>
+            )}
+
+            {!gate && step === 'form' && (
               <form onSubmit={submit} noValidate className="anim-fade-up space-y-5">
+                <p className="flex items-center gap-2 rounded-2xl border border-line bg-inner px-4 py-3 text-sm text-mute">
+                  <ShieldCheck className="h-4 w-4 shrink-0 text-accent" />
+                  <span className="min-w-0 truncate">
+                    Đơn hàng gắn với <strong className="font-medium text-white">{user.email}</strong>
+                  </span>
+                </p>
                 <div>
                   <label htmlFor="co-name" className="text-sm text-mute">
                     Họ và tên
@@ -1542,7 +1533,7 @@ function CheckoutModal({ open, onClose }) {
                 </div>
 
                 <div>
-                  <span className="text-sm text-mute">Kênh nhận hướng dẫn kích hoạt</span>
+                  <span className="text-sm text-mute">Kênh liên hệ hỗ trợ</span>
                   <div className="mt-2 grid grid-cols-3 gap-2" role="radiogroup" aria-label="Kênh liên hệ">
                     {CONTACT_METHODS.map(({ id, label, icon: Icon }) => (
                       <button
@@ -1552,7 +1543,7 @@ function CheckoutModal({ open, onClose }) {
                         aria-checked={method === id}
                         onClick={() => {
                           setMethod(id);
-                          setContact('');
+                          setContact(id === 'email' ? user.email : '');
                         }}
                         className={`inline-flex items-center justify-center gap-1.5 rounded-full border px-3 py-2.5 text-sm font-medium tracking-tightish transition-colors ${
                           method === id ? 'border-white bg-white text-base' : 'border-line bg-inner text-white hover:border-line2'
@@ -1599,17 +1590,18 @@ function CheckoutModal({ open, onClose }) {
                     </>
                   )}
                 </PillButton>
-                <p className="text-center text-xs text-mute">Thông tin chỉ dùng để gửi file Skill và hướng dẫn cài đặt cho bạn.</p>
+                {submitError && <p className="text-center text-sm text-rose-300">{submitError}</p>}
+                <p className="text-center text-xs text-mute">Thông tin chỉ dùng để hỗ trợ cài đặt và mời bạn vào nhóm kín.</p>
               </form>
             )}
 
-            {step === 'payment' && (
+            {!gate && step === 'payment' && (
               <div className="anim-fade-up">
                 <div className="flex flex-col gap-5 sm:flex-row">
                   <div className="mx-auto w-44 shrink-0 sm:mx-0">
                     <div className="aspect-square overflow-hidden rounded-[24px] bg-white p-3">
                       {hasBank ? (
-                        <img src={qrUrl} alt={`Mã VietQR chuyển khoản ${formatVnd(BETA_PRICE)}`} className="h-full w-full object-contain" />
+                        <img src={qrUrl} alt={`Mã VietQR chuyển khoản ${formatVnd(amount)}`} className="h-full w-full object-contain" />
                       ) : (
                         <PatternQr seed={transferNote} />
                       )}
@@ -1623,14 +1615,14 @@ function CheckoutModal({ open, onClose }) {
                     <CopyField label="Ngân hàng" value={PAYMENT_CONFIG.bankName} />
                     <CopyField label="Số tài khoản" value={PAYMENT_CONFIG.accountNumber} />
                     <CopyField label="Chủ tài khoản" value={PAYMENT_CONFIG.accountName} />
-                    <CopyField label="Số tiền" value={String(BETA_PRICE)} />
+                    <CopyField label="Số tiền" value={String(amount)} />
                     <CopyField label="Nội dung chuyển khoản" value={transferNote} />
                   </div>
                 </div>
 
                 <p className="mt-5 rounded-[24px] border border-line bg-inner p-4 text-sm leading-[1.5] text-mute">
-                  Ghi <strong className="font-medium text-white">{transferNote}</strong> đúng trong nội dung chuyển khoản để hệ thống đối soát và
-                  giữ slot cho bạn.
+                  Ghi <strong className="font-medium text-white">{transferNote}</strong> đúng trong nội dung chuyển khoản. Hệ thống tự xác nhận
+                  trong vài giây sau khi tiền về.
                 </p>
 
                 <div className="mt-5 flex flex-col gap-2 sm:flex-row">
@@ -1644,29 +1636,38 @@ function CheckoutModal({ open, onClose }) {
               </div>
             )}
 
-            {step === 'done' && (
+            {!gate && step === 'done' && (
               <div className="anim-fade-up">
                 <span className="flex h-12 w-12 items-center justify-center rounded-full border border-line2 bg-chip">
-                  <CheckCircle2 className="h-6 w-6 text-white" />
+                  <Loader2 className="h-6 w-6 animate-spin text-white" />
                 </span>
-                <h3 className="mt-5 text-2xl font-medium tracking-tightish text-white">Đã ghi nhận đơn #{orderCode}</h3>
+                <h3 className="mt-5 text-2xl font-medium tracking-tightish text-white">Đang chờ xác nhận đơn #{order.code}</h3>
                 <p className="mt-2 text-base leading-[1.4] text-mute">
-                  Cảm ơn {name.trim() || 'bạn'}! Slot Beta của bạn đang được giữ trong lúc chúng tôi xác nhận giao dịch.
+                  Cảm ơn {name.trim() || 'bạn'}! Trang này tự cập nhật khi ngân hàng báo tiền về, thường trong vòng 1 phút. Bạn có thể đóng cửa sổ —
+                  đơn vẫn được ghi nhận và hiển thị trong trang thành viên.
                 </p>
-                <ol className="mt-6 space-y-2">
-                  {[
-                    'Đối soát giao dịch theo nội dung chuyển khoản của bạn.',
-                    `Gửi file Skill và hướng dẫn cài đặt qua ${methodCfg.label}: ${contact.trim()}.`,
-                    'Mời bạn vào nhóm kín hỗ trợ cài đặt & nhận bản cập nhật chính thức miễn phí.',
-                  ].map((t, i) => (
-                    <li key={t} className="flex gap-3 rounded-2xl border border-line bg-inner p-4 text-sm leading-[1.4] text-white">
-                      <span className="text-mute">0{i + 1}</span>
-                      {t}
-                    </li>
-                  ))}
-                </ol>
-                <PillButton onClick={onClose} className="mt-6 w-full">
-                  Hoàn tất
+                <div className="mt-6 flex flex-col gap-2 sm:flex-row">
+                  <PillButton variant="dark" size="lg" onClick={() => setStep('payment')}>
+                    <ChevronLeft className="h-4 w-4" /> Xem lại thông tin CK
+                  </PillButton>
+                  <PillButton className="flex-1" onClick={() => window.location.assign('/account')}>
+                    Mở trang thành viên <ArrowRight className="h-4 w-4" />
+                  </PillButton>
+                </div>
+              </div>
+            )}
+
+            {!gate && step === 'paid' && (
+              <div className="anim-fade-up">
+                <span className="flex h-12 w-12 items-center justify-center rounded-full border border-line2 bg-chip">
+                  <CheckCircle2 className="h-6 w-6 text-accent" />
+                </span>
+                <h3 className="mt-5 text-2xl font-medium tracking-tightish text-white">Thanh toán thành công!</h3>
+                <p className="mt-2 text-base leading-[1.4] text-mute">
+                  Đơn #{order.code} đã được xác nhận. File Skill, hướng dẫn cài đặt và link nhóm kín đang chờ bạn.
+                </p>
+                <PillButton className="mt-6 w-full" onClick={() => window.location.assign('/account')}>
+                  Vào trang thành viên <ArrowRight className="h-4 w-4" />
                 </PillButton>
               </div>
             )}
@@ -1674,7 +1675,7 @@ function CheckoutModal({ open, onClose }) {
 
           <aside className="border-t border-line p-6 sm:p-8 md:border-l md:border-t-0">
             <p className="text-sm text-mute">Đơn hàng</p>
-            <p className="mt-3 text-base font-medium tracking-tightish text-white">Phiên Bản Thử Nghiệm (Beta Test)</p>
+            <p className="mt-3 text-base font-medium tracking-tightish text-white">{PRODUCT_NAME}</p>
             <p className="mt-1 text-sm text-mute">Sở hữu vĩnh viễn · Miễn phí nâng cấp bản chính thức</p>
             <div className="mt-6 space-y-2 border-t border-line pt-5 text-sm">
               <div className="flex justify-between text-mute">
@@ -1802,14 +1803,20 @@ function Footer() {
 /* ------------------------------------------------------------------ */
 
 export default function App() {
-  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const { me, reload: reloadMe } = useMe();
+  // Google sign-in from the checkout returns to /?checkout=1 to reopen the modal.
+  const [checkoutOpen, setCheckoutOpen] = useState(() => new URLSearchParams(window.location.search).has('checkout'));
   const openCheckout = useCallback(() => setCheckoutOpen(true), []);
   const closeCheckout = useCallback(() => setCheckoutOpen(false), []);
+
+  useEffect(() => {
+    if (checkoutOpen && window.location.search) window.history.replaceState(null, '', window.location.pathname);
+  }, [checkoutOpen]);
 
   return (
     <div className="min-h-screen overflow-x-clip bg-base font-sans text-white">
       <GlobalStyles />
-      <Navbar onCheckout={openCheckout} />
+      <Navbar onCheckout={openCheckout} me={me} />
       <main>
         <Hero />
         <Workflow />
@@ -1821,7 +1828,7 @@ export default function App() {
         <FooterCta onCheckout={openCheckout} />
       </main>
       <Footer />
-      <CheckoutModal open={checkoutOpen} onClose={closeCheckout} />
+      <CheckoutModal open={checkoutOpen} onClose={closeCheckout} me={me} reloadMe={reloadMe} />
     </div>
   );
 }

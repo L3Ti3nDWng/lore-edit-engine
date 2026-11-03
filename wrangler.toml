@@ -1,0 +1,24 @@
+name = "lore-edit-engine"
+pages_build_output_dir = "dist"
+compatibility_date = "2026-10-01"
+
+[vars]
+# Comma-separated Google emails that can open /admin.
+ADMIN_EMAILS = ""
+# Invite links shown on /account only to users with a paid order.
+SUPPORT_ZALO_URL = ""
+SUPPORT_DISCORD_URL = ""
+
+# Secrets — set with `npx wrangler pages secret put <NAME>` (and in .dev.vars locally):
+#   GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, SEPAY_API_KEY
+
+[[d1_databases]]
+binding = "DB"
+database_name = "lore-edit-engine"
+# Replace with the id printed by `npx wrangler d1 create lore-edit-engine`.
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"
+
+[[r2_buckets]]
+binding = "FILES"
+bucket_name = "lore-edit-engine-files"

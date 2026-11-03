@@ -1,0 +1,9 @@
+# Copy to .dev.vars for local development (never commit .dev.vars).
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+SEPAY_API_KEY=local-sepay-key
+ADMIN_EMAILS=you@gmail.com
+SUPPORT_ZALO_URL=https://zalo.me/g/example
+SUPPORT_DISCORD_URL=https://discord.gg/example
+# Enables POST /api/auth/dev (sign in as any email without Google). Local only.
+DEV_LOGIN=1
