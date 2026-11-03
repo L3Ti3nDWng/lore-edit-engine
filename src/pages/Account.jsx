@@ -263,7 +263,7 @@ function NotEntitled({ me }) {
       {pending && (
         <div className="mt-6 space-y-2">
           <CopyField label="Số tiền" value={String(pending.amount)} />
-          <CopyField label="Nội dung chuyển khoản" value={pending.transferNote} />
+          <CopyField label="Nội dung chuyển khoản" value={pending.payment?.description} />
         </div>
       )}
       <div className="mt-8 flex flex-col gap-2 sm:flex-row">
@@ -320,14 +320,21 @@ function MemberHome({ me }) {
 
 export default function Account() {
   const { me, error, reload } = useMe();
-  const waiting = Boolean(me?.user && !me.entitled && me.orders.some((o) => o.status === 'pending'));
+  const pendingCode = me?.user && !me.entitled ? me.orders.find((o) => o.status === 'pending')?.code : null;
 
-  // Unlock automatically once the webhook confirms the transfer.
+  // Unlock automatically once payOS confirms the payment: check payOS right away
+  // (the buyer may be arriving from the payOS return URL), then keep polling.
   useEffect(() => {
-    if (!waiting) return undefined;
+    if (!pendingCode) return undefined;
+    const sync = () => api(`/orders/${pendingCode}?sync=1`).then(reload, () => {});
+    sync();
     const id = setInterval(reload, 8000);
-    return () => clearInterval(id);
-  }, [waiting, reload]);
+    const slow = setInterval(sync, 30000);
+    return () => {
+      clearInterval(id);
+      clearInterval(slow);
+    };
+  }, [pendingCode, reload]);
 
   useEffect(() => {
     document.title = 'Trang thành viên — AI EDITOR';

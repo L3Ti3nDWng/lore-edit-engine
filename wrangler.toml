@@ -4,19 +4,18 @@ compatibility_date = "2026-10-01"
 
 [vars]
 # Comma-separated Google emails that can open /admin.
-ADMIN_EMAILS = ""
+ADMIN_EMAILS = "dungvien1209@gmail.com"
 # Invite links shown on /account only to users with a paid order.
 SUPPORT_ZALO_URL = ""
 SUPPORT_DISCORD_URL = ""
 
 # Secrets — set with `npx wrangler pages secret put <NAME>` (and in .dev.vars locally):
-#   GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, SEPAY_API_KEY
+#   GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, PAYOS_CLIENT_ID, PAYOS_API_KEY, PAYOS_CHECKSUM_KEY
 
 [[d1_databases]]
 binding = "DB"
 database_name = "ai-editor"
-# Replace with the id printed by `npx wrangler d1 create ai-editor`.
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "1490d618-dbf2-40f6-85f3-b22d5d8e667c"
 migrations_dir = "migrations"
 
 [[r2_buckets]]

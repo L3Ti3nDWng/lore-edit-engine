@@ -1,23 +1,18 @@
-import { ORDER_CODE_ALPHABET, ORDER_CODE_LENGTH, ORDER_PREFIX, transferNoteFor } from '../shared/config.js';
+import { ORDER_CODE_ALPHABET, ORDER_CODE_LENGTH, ORDER_PREFIX } from '../shared/config.js';
+import { createPaymentLink, newPayosOrderCode } from './payos.js';
 
 export function newOrderCode() {
   const bytes = crypto.getRandomValues(new Uint8Array(ORDER_CODE_LENGTH));
   return ORDER_PREFIX + [...bytes].map((b) => ORDER_CODE_ALPHABET[b % ORDER_CODE_ALPHABET.length]).join('');
 }
 
-// Every order code that could appear in a bank transfer note. Banks drop or mangle
-// spaces and punctuation, so we scan the content with all separators removed.
-export function findOrderCodes(...texts) {
-  const codes = new Set();
-  for (const text of texts) {
-    const s = String(text || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-    for (let i = s.indexOf(ORDER_PREFIX); i !== -1; i = s.indexOf(ORDER_PREFIX, i + 1)) {
-      const body = s.slice(i + ORDER_PREFIX.length, i + ORDER_PREFIX.length + ORDER_CODE_LENGTH);
-      if (body.length === ORDER_CODE_LENGTH && [...body].every((c) => ORDER_CODE_ALPHABET.includes(c))) codes.add(ORDER_PREFIX + body);
-    }
+const parseLink = (o) => {
+  try {
+    return o.payos_link ? JSON.parse(o.payos_link) : null;
+  } catch {
+    return null;
   }
-  return [...codes];
-}
+};
 
 export const publicOrder = (o) => ({
   code: o.code,
@@ -29,5 +24,33 @@ export const publicOrder = (o) => ({
   paidVia: o.paid_via,
   paidAt: o.paid_at,
   createdAt: o.created_at,
-  transferNote: transferNoteFor(o.code),
+  // Present while the order is pending: QR string, bank account and transfer note from payOS.
+  payment: o.status === 'pending' ? parseLink(o) : null,
 });
+
+export const siteOrigin = (env, request) => env.PUBLIC_ORIGIN || new URL(request.url).origin;
+
+// Gives a pending order a payOS payment link that is valid for at least another
+// 10 minutes, creating a fresh one (new payOS orderCode) when needed.
+export async function ensurePaymentLink(env, request, order, user) {
+  const current = parseLink(order);
+  if (current && current.amount === order.amount && current.expiresAt > Date.now() + 10 * 60 * 1000) return order;
+  const origin = siteOrigin(env, request);
+  for (let attempt = 0; ; attempt++) {
+    const orderCode = newPayosOrderCode();
+    if (attempt < 3 && (await env.DB.prepare('SELECT 1 FROM orders WHERE payos_order_code = ?').bind(orderCode).first())) continue;
+    const link = await createPaymentLink(env, {
+      orderCode,
+      amount: order.amount,
+      // Order code only: payOS caps descriptions at 9 characters for non-linked bank accounts.
+      description: order.code,
+      returnUrl: `${origin}/account?payment=done`,
+      cancelUrl: `${origin}/?checkout=1`,
+      buyerName: order.name,
+      buyerEmail: user?.email,
+    });
+    const payosLink = JSON.stringify(link);
+    await env.DB.prepare('UPDATE orders SET payos_order_code = ?, payos_link = ? WHERE code = ?').bind(link.orderCode, payosLink, order.code).run();
+    return { ...order, payos_order_code: link.orderCode, payos_link: payosLink };
+  }
+}

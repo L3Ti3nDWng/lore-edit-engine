@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Check, FileArchive, Link2, Loader2, Search, Send, Trash2, Upload, X } from 'lucide-react';
-import { BETA_PRICE } from '../../shared/config.js';
+import PayosQr from '../PayosQr.jsx';
 import { api, useMe } from '../lib/api.js';
 import { DevSignIn, GoogleSignInButton } from '../SignIn.jsx';
 import { PillButton, formatVnd, inputClass } from '../ui.jsx';
@@ -10,7 +10,7 @@ const TABS = [
   { id: 'orders', label: 'Đơn hàng' },
   { id: 'transactions', label: 'Giao dịch chưa khớp' },
   { id: 'releases', label: 'Phiên bản' },
-  { id: 'sepay', label: 'Thử SePay' },
+  { id: 'payos', label: 'Thử payOS' },
 ];
 
 const ORDER_FILTERS = [
@@ -169,7 +169,7 @@ function OrdersTab() {
                   <p className="text-sm font-medium text-white">{formatVnd(o.amount)}</p>
                   <span className={`mt-1 inline-block whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-medium ${badgeClass}`}>
                     {badge}
-                    {o.paidVia && ` · ${o.paidVia === 'sepay' ? 'SePay' : 'tay'}`}
+                    {o.paidVia && ` · ${o.paidVia === 'payos' ? 'payOS' : 'tay'}`}
                   </span>
                 </div>
                 <div className="flex gap-2 md:justify-end">
@@ -230,7 +230,7 @@ function TransactionsTab() {
   return (
     <div className="space-y-5">
       <p className="max-w-[720px] text-sm leading-[1.6] text-mute">
-        Tiền đã về qua SePay nhưng không khớp đơn nào (khách ghi sai nội dung, chuyển thiếu, hoặc chuyển cho mục đích khác). Gắn giao dịch vào
+        Thanh toán payOS không khớp đơn nào (chuyển thiếu, đơn đã huỷ, hoặc link thử từ tab “Thử payOS”). Gắn giao dịch vào
         đúng mã đơn để kích hoạt cho khách.
       </p>
       <ErrorNote error={error} />
@@ -287,19 +287,15 @@ function TransactionsTab() {
 }
 
 /* ------------------------------------------------------------------ */
-/* SePay tester                                                        */
+/* payOS tester                                                        */
 /* ------------------------------------------------------------------ */
 
-// [title, tone] per outcome from POST /api/admin/sepay-test.
-const SEPAY_OUTCOMES = {
-  paid: ['Khớp đơn — đủ tiền', 'ok'],
-  underpaid: ['Khớp đơn — chuyển thiếu tiền', 'warn'],
-  already_paid: ['Đơn này đã thanh toán trước đó', 'warn'],
-  cancelled: ['Đơn này đã bị huỷ', 'warn'],
-  no_order: ['Có mã đơn nhưng không tìm thấy đơn', 'bad'],
-  no_code: ['Không tìm thấy mã đơn trong nội dung', 'bad'],
-  duplicate: ['Giao dịch trùng — đã xử lý trước đó', 'warn'],
-  ignored: ['Bỏ qua (không phải tiền vào)', 'warn'],
+const PAYOS_STATUS = {
+  PENDING: ['Chờ thanh toán', 'warn'],
+  PROCESSING: ['Đang xử lý', 'warn'],
+  PAID: ['Đã thanh toán', 'ok'],
+  CANCELLED: ['Đã huỷ', 'bad'],
+  EXPIRED: ['Hết hạn', 'bad'],
 };
 
 const TONE_CLASS = {
@@ -308,29 +304,27 @@ const TONE_CLASS = {
   bad: 'border-rose-400/60 bg-rose-400/10',
 };
 
-function outcomeDetail(r) {
-  const { outcome, order, commit, note, codes } = r;
-  if (outcome === 'paid') return commit ? `Đơn ${order.code} đã được kích hoạt. Khách thấy "Thanh toán thành công" trong vài giây.` : `Đơn ${order.code} sẽ được kích hoạt nếu tiền về với nội dung này.`;
-  if (outcome === 'no_order') return `Tìm thấy ${codes.join(', ')} nhưng không có đơn nào mang mã này.`;
-  if (outcome === 'no_code') return commit ? 'Giao dịch đã lưu vào tab "Giao dịch chưa khớp" để gắn tay.' : 'Giao dịch sẽ nằm ở tab "Giao dịch chưa khớp" để admin gắn tay.';
-  return note;
+function KeyRow({ label, ok }) {
+  return (
+    <div className="flex justify-between gap-4">
+      <dt className="text-mute">{label}</dt>
+      <dd className={ok ? 'text-accent' : 'text-rose-300'}>{ok ? 'Đã cấu hình' : 'Chưa cấu hình'}</dd>
+    </div>
+  );
 }
 
-function SepayTestTab() {
+function PayosTestTab() {
   const [status, setStatus] = useState(null);
-  const [pending, setPending] = useState([]);
-  const [amount, setAmount] = useState(String(BETA_PRICE));
-  const [content, setContent] = useState('');
-  const [commit, setCommit] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [amount, setAmount] = useState('2000');
+  const [description, setDescription] = useState('TEST01');
+  const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
-  const [results, setResults] = useState([]);
+  const [webhookResult, setWebhookResult] = useState(null);
+  const [links, setLinks] = useState([]);
 
   const load = useCallback(async () => {
     try {
-      const [s, o] = await Promise.all([api('/admin/sepay-test'), api('/admin/orders?status=pending')]);
-      setStatus(s);
-      setPending(o.orders.slice(0, 6));
+      setStatus(await api('/admin/payos'));
     } catch (err) {
       setError(err.message);
     }
@@ -339,158 +333,181 @@ function SepayTestTab() {
     load();
   }, [load]);
 
-  const submit = async (e) => {
-    e.preventDefault();
-    if (commit && !window.confirm(`Ghi thật giao dịch ${formatVnd(Number(amount) || 0)}? Nếu khớp, đơn sẽ được kích hoạt như khi tiền về thật.`)) return;
-    setBusy(true);
+  const run = async (key, fn) => {
+    setBusy(key);
     setError('');
     try {
-      const r = await api('/admin/sepay-test', { method: 'POST', body: { amount: Number(amount), content, commit } });
-      setResults((list) => [{ ...r, amount: Number(amount), content, at: Date.now() }, ...list].slice(0, 5));
-      if (commit) load();
+      await fn();
     } catch (err) {
       setError(err.message);
     } finally {
-      setBusy(false);
+      setBusy('');
     }
   };
 
+  const registerWebhook = () =>
+    run('webhook', async () => {
+      const { result } = await api('/admin/payos', { method: 'POST', body: { action: 'confirm-webhook' } });
+      setWebhookResult(result);
+    });
+
+  const createTest = (e) => {
+    e.preventDefault();
+    run('create', async () => {
+      const { link } = await api('/admin/payos', { method: 'POST', body: { action: 'create-test', amount: Number(amount), description } });
+      setLinks((list) => [{ ...link, status: 'PENDING' }, ...list].slice(0, 5));
+    });
+  };
+
+  const updateLink = (orderCode, action) =>
+    run(`${action}-${orderCode}`, async () => {
+      const { info } = await api('/admin/payos', { method: 'POST', body: { action, orderCode } });
+      setLinks((list) => list.map((l) => (l.orderCode === orderCode ? { ...l, status: info.status, amountPaid: info.amountPaid } : l)));
+      load();
+    });
+
   const parsedAmount = Number(amount);
+  const keysOk = status && (status.mock || (status.keys.clientId && status.keys.apiKey && status.keys.checksumKey));
 
   return (
     <div className="grid gap-5 lg:grid-cols-[420px_1fr] lg:items-start">
       <div className="space-y-3">
         <div className="rounded-[24px] border border-line bg-card p-5 text-sm">
-          <p className="font-medium text-white">Kết nối SePay</p>
+          <div className="flex items-center justify-between gap-3">
+            <p className="font-medium text-white">Kết nối payOS</p>
+            {status?.mock && <span className="rounded-full border border-amber-400/60 px-2 py-0.5 text-[11px] text-amber-300">Mock (local)</span>}
+          </div>
           {!status ? (
             <p className="mt-2 text-mute">Đang kiểm tra...</p>
           ) : (
-            <dl className="mt-3 space-y-2">
-              <div className="flex justify-between gap-4">
-                <dt className="text-mute">SEPAY_API_KEY</dt>
-                <dd className={status.apiKeyConfigured ? 'text-accent' : 'text-rose-300'}>{status.apiKeyConfigured ? 'Đã cấu hình' : 'Chưa cấu hình'}</dd>
+            <>
+              <dl className="mt-3 space-y-2">
+                <KeyRow label="PAYOS_CLIENT_ID" ok={status.keys.clientId || status.mock} />
+                <KeyRow label="PAYOS_API_KEY" ok={status.keys.apiKey || status.mock} />
+                <KeyRow label="PAYOS_CHECKSUM_KEY" ok={status.keys.checksumKey} />
+                <div className="flex justify-between gap-4">
+                  <dt className="shrink-0 text-mute">Webhook gần nhất</dt>
+                  <dd className="min-w-0 truncate text-right text-white">
+                    {status.lastWebhook ? `${formatDateTime(status.lastWebhook.receivedAt)} · ${formatVnd(status.lastWebhook.amount)}` : 'Chưa nhận lần nào'}
+                  </dd>
+                </div>
+              </dl>
+              <div className="mt-4 border-t border-line pt-4">
+                <p className="text-xs text-mute">Webhook URL</p>
+                <p className="mt-1 break-all font-mono text-xs text-white">{status.webhookUrl}</p>
+                <div className="mt-3">
+                  <SmallButton onClick={registerWebhook} disabled={!keysOk || busy === 'webhook'}>
+                    {busy === 'webhook' ? <Loader2 className="h-3 w-3 animate-spin" /> : <Link2 className="h-3 w-3" />} Đăng ký webhook với payOS
+                  </SmallButton>
+                </div>
+                {webhookResult && (
+                  <p className="mt-3 rounded-2xl border border-accent/60 bg-accent/10 px-3 py-2 text-xs text-white">
+                    Đã đăng ký. Kênh: {webhookResult.name || webhookResult.shortName} · {webhookResult.accountName} {webhookResult.accountNumber}
+                  </p>
+                )}
               </div>
-              <div className="flex justify-between gap-4">
-                <dt className="shrink-0 text-mute">Webhook thật gần nhất</dt>
-                <dd className="min-w-0 truncate text-right text-white">
-                  {status.lastWebhook ? `${formatDateTime(status.lastWebhook.receivedAt)} · ${formatVnd(status.lastWebhook.amount)}` : 'Chưa nhận lần nào'}
-                </dd>
-              </div>
-            </dl>
+            </>
           )}
         </div>
 
-        <form onSubmit={submit} className="space-y-4 rounded-[32px] border border-line bg-card p-6">
-          <p className="text-lg font-medium tracking-tightish text-white">Gửi giao dịch thử</p>
-
-          {pending.length > 0 && (
-            <div>
-              <p className="text-sm text-mute">Điền nhanh từ đơn đang chờ</p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {pending.map((o) => (
-                  <SmallButton
-                    key={o.code}
-                    onClick={() => {
-                      setAmount(String(o.amount));
-                      setContent(o.transferNote);
-                    }}
-                  >
-                    <span className="font-mono">{o.code}</span> · {o.name}
-                  </SmallButton>
-                ))}
-              </div>
-            </div>
-          )}
+        <form onSubmit={createTest} className="space-y-4 rounded-[32px] border border-line bg-card p-6">
+          <div>
+            <p className="text-lg font-medium tracking-tightish text-white">Tạo link thanh toán thử</p>
+            <p className="mt-1 text-sm leading-[1.5] text-mute">Gọi API payOS thật với số tiền và nội dung tuỳ chọn. Link không gắn với đơn nào — thanh toán xong sẽ hiện ở “Giao dịch chưa khớp”.</p>
+          </div>
 
           <div>
-            <label htmlFor="st-amount" className="text-sm text-mute">
+            <label htmlFor="pt-amount" className="text-sm text-mute">
               Số tiền (VND)
             </label>
             <input
-              id="st-amount"
+              id="pt-amount"
               value={amount}
               onChange={(e) => setAmount(e.target.value.replace(/[^\d]/g, ''))}
               inputMode="numeric"
               required
               className={inputClass(false)}
             />
-            <p className="mt-1.5 text-xs text-mute">{parsedAmount > 0 ? formatVnd(parsedAmount) : 'Nhập số tiền'}</p>
+            <p className="mt-1.5 text-xs text-mute">{parsedAmount > 0 ? formatVnd(parsedAmount) : 'Nhập số tiền'} · tối thiểu 1.000đ</p>
           </div>
 
           <div>
-            <label htmlFor="st-content" className="text-sm text-mute">
+            <label htmlFor="pt-desc" className="text-sm text-mute">
               Nội dung chuyển khoản
             </label>
-            <textarea
-              id="st-content"
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              rows={3}
+            <input
+              id="pt-desc"
+              value={description}
+              onChange={(e) => setDescription(e.target.value.slice(0, 25))}
               required
-              maxLength={500}
-              placeholder="MBVCB.123456 AIEDITOR BETA AE7K2QXM chuyen tien"
-              className={`${inputClass(false)} font-mono text-sm`}
+              className={`${inputClass(false)} font-mono`}
             />
-            <p className="mt-1.5 text-xs text-mute">Ghi như ngân hàng gửi về — có thể viết thường, dính liền hoặc kèm chữ thừa.</p>
-          </div>
-
-          <div>
-            <span className="text-sm text-mute">Chế độ</span>
-            <div className="mt-2 grid grid-cols-2 gap-2" role="radiogroup" aria-label="Chế độ thử">
-              <Chip active={!commit} onClick={() => setCommit(false)}>
-                Chạy thử
-              </Chip>
-              <Chip active={commit} onClick={() => setCommit(true)}>
-                Ghi thật
-              </Chip>
-            </div>
-            <p className={`mt-2 text-xs leading-[1.5] ${commit ? 'text-amber-300' : 'text-mute'}`}>
-              {commit
-                ? 'Lưu giao dịch (cổng TEST) và kích hoạt đơn nếu khớp — y như tiền về thật. Doanh thu sẽ tính cả giao dịch này.'
-                : 'Chỉ xem hệ thống sẽ khớp thế nào, không ghi gì vào database.'}
+            <p className={`mt-1.5 text-xs ${description.length > 9 ? 'text-amber-300' : 'text-mute'}`}>
+              {description.length}/25 ký tự
+              {description.length > 9 && ' · tài khoản chưa liên kết qua payOS chỉ nhận tối đa 9 ký tự'}
             </p>
           </div>
 
           <ErrorNote error={error} />
-          <PillButton type="submit" disabled={busy || !(parsedAmount > 0) || !content.trim()} className="w-full">
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            {commit ? 'Gửi và ghi thật' : 'Chạy thử'}
+          <PillButton type="submit" disabled={!keysOk || busy === 'create' || !(parsedAmount >= 1000) || !description.trim()} className="w-full">
+            {busy === 'create' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            Tạo link payOS
           </PillButton>
         </form>
       </div>
 
       <div className="min-w-0">
-        {!results.length ? (
-          <p className="rounded-[24px] border border-dashed border-line2 p-8 text-center text-sm text-mute">Kết quả các lần thử sẽ hiện ở đây.</p>
+        {!links.length ? (
+          <p className="rounded-[24px] border border-dashed border-line2 p-8 text-center text-sm text-mute">Link thử vừa tạo sẽ hiện ở đây, kèm mã QR để quét.</p>
         ) : (
-          <ul className="space-y-2.5" aria-live="polite">
-            {results.map((r) => {
-              const [title, tone] = SEPAY_OUTCOMES[r.outcome] || [r.outcome, 'warn'];
+          <ul className="space-y-3" aria-live="polite">
+            {links.map((l) => {
+              const [label, tone] = PAYOS_STATUS[l.status] || [l.status, 'warn'];
               return (
-                <li key={r.at} className={`rounded-[24px] border p-5 ${TONE_CLASS[tone]}`}>
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="font-medium text-white">{title}</p>
-                    <span className="rounded-full border border-line2 px-2 py-0.5 text-[11px] text-mute">{r.commit ? 'Đã ghi thật' : 'Chạy thử'}</span>
-                  </div>
-                  <p className="mt-1 text-sm leading-[1.5] text-white/85">{outcomeDetail(r)}</p>
-                  <dl className="mt-3 space-y-1 border-t border-white/10 pt-3 text-xs">
-                    <div className="flex gap-3">
-                      <dt className="w-20 shrink-0 text-mute">Số tiền</dt>
-                      <dd className="text-white">{formatVnd(r.amount)}</dd>
-                    </div>
-                    <div className="flex gap-3">
-                      <dt className="w-20 shrink-0 text-mute">Nội dung</dt>
-                      <dd className="min-w-0 break-words font-mono text-white">{r.content}</dd>
-                    </div>
-                    {r.order && (
-                      <div className="flex gap-3">
-                        <dt className="w-20 shrink-0 text-mute">Đơn</dt>
-                        <dd className="min-w-0 text-white">
-                          <span className="font-mono">{r.order.code}</span> · {r.order.name} · cần {formatVnd(r.order.amount)}
-                        </dd>
+                <li key={l.orderCode} className={`rounded-[24px] border p-5 ${TONE_CLASS[tone]}`}>
+                  <div className="flex flex-col gap-5 sm:flex-row">
+                    <div className="mx-auto w-40 shrink-0 sm:mx-0">
+                      <div className="aspect-square overflow-hidden rounded-[20px] bg-white p-2.5">
+                        <PayosQr value={l.qrCode} label={`QR thử ${formatVnd(l.amount)}`} caption={`${formatVnd(l.amount)} · ${l.description}`} />
                       </div>
-                    )}
-                  </dl>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-lg font-medium tracking-tightish text-white">{formatVnd(l.amount)}</p>
+                        <span className="rounded-full border border-line2 px-2 py-0.5 text-[11px] text-white">{label}</span>
+                      </div>
+                      <dl className="mt-2 space-y-1 text-xs">
+                        {[
+                          ['Nội dung', l.description],
+                          ['Tài khoản', `${l.bankName || l.bin} · ${l.accountNumber} · ${l.accountName}`],
+                          ['Mã payOS', l.orderCode],
+                        ].map(([k, v]) => (
+                          <div key={k} className="flex gap-3">
+                            <dt className="w-20 shrink-0 text-mute">{k}</dt>
+                            <dd className="min-w-0 break-words font-mono text-white">{v}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <a
+                          href={l.checkoutUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1.5 rounded-full border border-white bg-white px-3 py-1.5 text-xs font-medium text-black hover:opacity-90"
+                        >
+                          Mở trang payOS
+                        </a>
+                        <SmallButton onClick={() => updateLink(l.orderCode, 'status')} disabled={busy === `status-${l.orderCode}`}>
+                          {busy === `status-${l.orderCode}` ? <Loader2 className="h-3 w-3 animate-spin" /> : <Search className="h-3 w-3" />} Kiểm tra trạng thái
+                        </SmallButton>
+                        {['PENDING', 'PROCESSING'].includes(l.status) && (
+                          <SmallButton tone="danger" onClick={() => updateLink(l.orderCode, 'cancel')} disabled={busy === `cancel-${l.orderCode}`}>
+                            <X className="h-3 w-3" /> Huỷ link
+                          </SmallButton>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </li>
               );
             })}
@@ -672,7 +689,7 @@ export default function Admin() {
           {tab === 'orders' && <OrdersTab />}
           {tab === 'transactions' && <TransactionsTab />}
           {tab === 'releases' && <ReleasesTab />}
-          {tab === 'sepay' && <SepayTestTab />}
+          {tab === 'payos' && <PayosTestTab />}
         </div>
       </>
     );

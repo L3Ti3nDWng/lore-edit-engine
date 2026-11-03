@@ -8,14 +8,13 @@ export const BETA_SLOTS_TOTAL = 100;
 
 export const PRODUCT_NAME = 'Phiên Bản Thử Nghiệm (Beta Test)';
 
-// Order codes look like AE7K2QXM. The transfer note is "AIEDITOR BETA <code>";
-// banks often strip spaces, so the webhook matches the code anywhere in the content.
+// Order codes look like AE7K2QXM; the code is also the payOS transfer description.
 export const ORDER_PREFIX = 'AE';
 export const ORDER_CODE_LENGTH = 6;
 export const ORDER_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-export const transferNoteFor = (code) => `AIEDITOR BETA ${code}`;
 
-export const CONTACT_METHOD_IDS = ['email', 'zalo', 'discord'];
+// Offered at checkout. Older orders may still carry 'discord'.
+export const CONTACT_METHOD_IDS = ['email', 'zalo'];
 
 // Contact validation, used by the checkout form and re-checked by POST /api/orders.
 export const CONTACT_VALIDATORS = {

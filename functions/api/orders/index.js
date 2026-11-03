@@ -1,7 +1,7 @@
 import { BETA_PRICE, BETA_SLOTS_TOTAL, CONTACT_METHOD_IDS, CONTACT_VALIDATORS } from '../../../shared/config.js';
 import { requireUser } from '../../../server/auth.js';
 import { HttpError, json, now, readJson } from '../../../server/http.js';
-import { newOrderCode, publicOrder } from '../../../server/orders.js';
+import { ensurePaymentLink, newOrderCode, publicOrder } from '../../../server/orders.js';
 import { slotsTaken } from '../../../server/slots.js';
 
 // Creates the signed-in user's Beta order, or refreshes their open one so the
@@ -30,7 +30,8 @@ export async function onRequestPost(context) {
   }
   if (open) {
     await env.DB.prepare('UPDATE orders SET name = ?, contact_method = ?, contact = ? WHERE code = ?').bind(name, contactMethod, contact, open.code).run();
-    return json({ order: publicOrder({ ...open, name, contact_method: contactMethod, contact }) });
+    const withLink = await ensurePaymentLink(env, request, { ...open, name, contact_method: contactMethod, contact }, user);
+    return json({ order: publicOrder(withLink) });
   }
 
   for (let attempt = 0; attempt < 5; attempt++) {
@@ -40,7 +41,7 @@ export async function onRequestPost(context) {
     )
       .bind(order.code, order.user_id, name, contactMethod, contact, order.amount, order.status, order.created_at)
       .run();
-    if (meta.changes) return json({ order: publicOrder(order) }, { status: 201 });
+    if (meta.changes) return json({ order: publicOrder(await ensurePaymentLink(env, request, order, user)) }, { status: 201 });
   }
   throw new HttpError(500, 'code_collision');
 }

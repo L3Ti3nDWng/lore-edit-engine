@@ -1,7 +1,11 @@
 # Copy to .dev.vars for local development (never commit .dev.vars).
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
-SEPAY_API_KEY=local-sepay-key
+PAYOS_CLIENT_ID=
+PAYOS_API_KEY=
+PAYOS_CHECKSUM_KEY=local-checksum-key
+# Fakes payOS payment links so checkout works without real keys. Local only.
+PAYOS_MOCK=1
 ADMIN_EMAILS=you@gmail.com
 SUPPORT_ZALO_URL=https://zalo.me/g/example
 SUPPORT_DISCORD_URL=https://discord.gg/example

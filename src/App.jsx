@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ArrowRight,
   AudioWaveform,
@@ -36,6 +36,7 @@ import {
 } from 'lucide-react';
 import { BETA_PRICE, BETA_SLOTS_TOTAL, CONTACT_VALIDATORS, OFFICIAL_PRICE, PRODUCT_NAME, ULTIMATE_PRICE } from '../shared/config.js';
 import { api, useMe, useSlots } from './lib/api.js';
+import PayosQr from './PayosQr.jsx';
 import { DevSignIn, GoogleSignInButton } from './SignIn.jsx';
 import { Container, CopyField, GlobalStyles, Logo, PillButton, formatVnd, inputClass } from './ui.jsx';
 
@@ -46,14 +47,6 @@ import { Container, CopyField, GlobalStyles, Logo, PillButton, formatVnd, inputC
 // Prices and slot totals live in shared/config.js so the API charges the same amounts.
 // Slots taken are counted from paid orders (GET /api/stats).
 
-// Fill in to render a scannable VietQR code in the checkout modal.
-// bankId uses VietQR bank codes, e.g. "vcb", "mb", "tcb", "acb".
-const PAYMENT_CONFIG = {
-  bankId: '',
-  bankName: '',
-  accountNumber: '',
-  accountName: '',
-};
 
 /* ------------------------------------------------------------------ */
 /* Media (free Unsplash photos, stored in /public/media)               */
@@ -225,11 +218,14 @@ const FAN_CARDS = [
   { image: 'alley', className: 'left-0 top-0 z-10 h-[220px] w-[200px]' },
 ];
 
+// How buyers want to be reached for install support and the private group invite.
 const CONTACT_METHODS = [
   {
     id: 'email',
     label: 'Email',
     icon: Mail,
+    field: 'Địa chỉ Email',
+    type: 'email',
     placeholder: 'ban@email.com',
     validate: CONTACT_VALIDATORS.email,
     error: 'Email chưa đúng định dạng.',
@@ -238,17 +234,11 @@ const CONTACT_METHODS = [
     id: 'zalo',
     label: 'Zalo',
     icon: MessageCircle,
+    field: 'Số điện thoại Zalo',
+    type: 'tel',
     placeholder: '09xx xxx xxx',
     validate: CONTACT_VALIDATORS.zalo,
     error: 'Số Zalo cần 10 chữ số, ví dụ 0912 345 678.',
-  },
-  {
-    id: 'discord',
-    label: 'Discord',
-    icon: Bot,
-    placeholder: 'username',
-    validate: CONTACT_VALIDATORS.discord,
-    error: 'Tên Discord gồm 2–32 ký tự chữ, số, dấu chấm hoặc gạch dưới.',
   },
 ];
 
@@ -316,15 +306,6 @@ function useLoopingProgress(step = 1, interval = 70, pause = 1400) {
     return () => clearTimeout(timer);
   }, [step, interval, pause]);
   return value;
-}
-
-function hashString(str) {
-  let h = 2166136261;
-  for (let i = 0; i < str.length; i += 1) {
-    h ^= str.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
 }
 
 /* ------------------------------------------------------------------ */
@@ -1290,45 +1271,6 @@ function Pricing({ onCheckout }) {
 /* Checkout modal                                                      */
 /* ------------------------------------------------------------------ */
 
-function PatternQr({ seed }) {
-  const size = 25;
-  const cells = useMemo(() => {
-    let h = hashString(seed);
-    const out = [];
-    for (let i = 0; i < size * size; i += 1) {
-      h ^= h << 13;
-      h ^= h >>> 17;
-      h ^= h << 5;
-      out.push((h >>> 0) % 100 < 46);
-    }
-    return out;
-  }, [seed]);
-  const isFinder = (x, y) => (x < 7 && y < 7) || (x >= size - 7 && y < 7) || (x < 7 && y >= size - 7);
-
-  return (
-    <svg viewBox={`0 0 ${size} ${size}`} className="h-full w-full" shapeRendering="crispEdges" aria-hidden="true">
-      <rect width={size} height={size} fill="#fff" />
-      {cells.map((on, i) => {
-        const x = i % size;
-        const y = Math.floor(i / size);
-        if (isFinder(x, y) || !on) return null;
-        return <rect key={i} x={x} y={y} width="1" height="1" fill="#0A0A0A" />;
-      })}
-      {[
-        [0, 0],
-        [size - 7, 0],
-        [0, size - 7],
-      ].map(([x, y]) => (
-        <g key={`${x}-${y}`}>
-          <rect x={x} y={y} width="7" height="7" fill="#0A0A0A" />
-          <rect x={x + 1} y={y + 1} width="5" height="5" fill="#fff" />
-          <rect x={x + 2} y={y + 2} width="3" height="3" fill="#0A0A0A" />
-        </g>
-      ))}
-    </svg>
-  );
-}
-
 const POLL_MS = 4000;
 
 function CheckoutModal({ open, onClose, me, reloadMe }) {
@@ -1343,17 +1285,12 @@ function CheckoutModal({ open, onClose, me, reloadMe }) {
   const firstFieldRef = useRef(null);
 
   const user = me?.user;
-  const methodCfg = CONTACT_METHODS.find((m) => m.id === method);
   const nameError = touched && name.trim().length < 2 ? 'Vui lòng nhập họ tên (ít nhất 2 ký tự).' : '';
+  const methodCfg = CONTACT_METHODS.find((m) => m.id === method);
   const contactError = touched && !methodCfg.validate(contact) ? methodCfg.error : '';
-  const transferNote = order?.transferNote || '';
+  // payOS payment link for this order: QR string, bank account and transfer note.
+  const payment = order?.payment;
   const amount = order?.amount || BETA_PRICE;
-  const hasBank = Boolean(PAYMENT_CONFIG.bankId && PAYMENT_CONFIG.accountNumber);
-  const qrUrl = hasBank
-    ? `https://img.vietqr.io/image/${PAYMENT_CONFIG.bankId}-${PAYMENT_CONFIG.accountNumber}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(
-        transferNote
-      )}&accountName=${encodeURIComponent(PAYMENT_CONFIG.accountName)}`
-    : '';
 
   // Which screen to show before the order form: sign in, already owned, or the form.
   // A purchase that just completed keeps its own success screen.
@@ -1378,7 +1315,7 @@ function CheckoutModal({ open, onClose, me, reloadMe }) {
     if (!open || !user) return;
     const pending = me.orders.find((o) => o.status === 'pending');
     setName((v) => v || pending?.name || user.name);
-    if (pending) {
+    if (pending && CONTACT_METHODS.some((m) => m.id === pending.contactMethod)) {
       setMethod(pending.contactMethod);
       setContact(pending.contact);
     } else {
@@ -1397,12 +1334,16 @@ function CheckoutModal({ open, onClose, me, reloadMe }) {
     return () => clearTimeout(t);
   }, [open]);
 
-  // While the transfer is outstanding, poll until the SePay webhook (or an admin) marks it paid.
+  // While the transfer is outstanding, poll until the payOS webhook (or an admin) marks it paid.
+  // After "Tôi đã chuyển khoản", every third poll also asks the server to check payOS directly.
   useEffect(() => {
     if (!open || !order || order.status !== 'pending' || !['payment', 'done'].includes(step)) return undefined;
-    const id = setInterval(async () => {
+    let tick = 0;
+    const check = async () => {
+      tick += 1;
+      const sync = step === 'done' && tick % 3 === 1;
       try {
-        const { order: latest } = await api(`/orders/${order.code}`);
+        const { order: latest } = await api(`/orders/${order.code}${sync ? '?sync=1' : ''}`);
         if (latest.status === 'paid') {
           setOrder(latest);
           setStep('paid');
@@ -1411,7 +1352,9 @@ function CheckoutModal({ open, onClose, me, reloadMe }) {
       } catch {
         // Transient network errors: keep polling.
       }
-    }, POLL_MS);
+    };
+    if (step === 'done') check();
+    const id = setInterval(check, POLL_MS);
     return () => clearInterval(id);
   }, [open, order, step, reloadMe]);
 
@@ -1538,7 +1481,7 @@ function CheckoutModal({ open, onClose, me, reloadMe }) {
 
                 <div>
                   <span className="text-sm text-mute">Kênh liên hệ hỗ trợ</span>
-                  <div className="mt-2 grid grid-cols-3 gap-2" role="radiogroup" aria-label="Kênh liên hệ">
+                  <div className="mt-2 grid grid-cols-2 gap-2" role="radiogroup" aria-label="Kênh liên hệ">
                     {CONTACT_METHODS.map(({ id, label, icon: Icon }) => (
                       <button
                         key={id}
@@ -1562,15 +1505,15 @@ function CheckoutModal({ open, onClose, me, reloadMe }) {
 
                 <div>
                   <label htmlFor="co-contact" className="text-sm text-mute">
-                    {method === 'email' ? 'Địa chỉ Email' : method === 'zalo' ? 'Số điện thoại Zalo' : 'Tên người dùng Discord'}
+                    {methodCfg.field}
                   </label>
                   <input
                     id="co-contact"
                     value={contact}
                     onChange={(e) => setContact(e.target.value)}
-                    type={method === 'email' ? 'email' : method === 'zalo' ? 'tel' : 'text'}
-                    inputMode={method === 'zalo' ? 'tel' : undefined}
-                    autoComplete={method === 'email' ? 'email' : method === 'zalo' ? 'tel' : 'off'}
+                    type={methodCfg.type}
+                    inputMode={methodCfg.type === 'tel' ? 'tel' : undefined}
+                    autoComplete={methodCfg.type}
                     placeholder={methodCfg.placeholder}
                     aria-invalid={Boolean(contactError)}
                     aria-describedby={contactError ? 'co-contact-err' : undefined}
@@ -1602,31 +1545,40 @@ function CheckoutModal({ open, onClose, me, reloadMe }) {
             {!gate && step === 'payment' && (
               <div className="anim-fade-up">
                 <div className="flex flex-col gap-5 sm:flex-row">
-                  <div className="mx-auto w-44 shrink-0 sm:mx-0">
+                  <div className="mx-auto w-48 shrink-0 sm:mx-0">
                     <div className="aspect-square overflow-hidden rounded-[24px] bg-white p-3">
-                      {hasBank ? (
-                        <img src={qrUrl} alt={`Mã VietQR chuyển khoản ${formatVnd(amount)}`} className="h-full w-full object-contain" />
-                      ) : (
-                        <PatternQr seed={transferNote} />
-                      )}
+                      <PayosQr
+                        value={payment?.qrCode}
+                        label={`Mã VietQR chuyển khoản ${formatVnd(amount)}`}
+                        caption={`${formatVnd(amount)} · ${payment?.description || ''}`}
+                      />
                     </div>
                     <p className="mt-2 flex items-center justify-center gap-1.5 text-center text-xs text-mute">
                       <QrCode className="h-3.5 w-3.5 shrink-0" />
-                      {hasBank ? 'Quét bằng app ngân hàng' : 'Mã QR hiển thị khi cấu hình tài khoản nhận'}
+                      Chạm vào mã để phóng to
                     </p>
                   </div>
                   <div className="flex-1 space-y-2">
-                    <CopyField label="Ngân hàng" value={PAYMENT_CONFIG.bankName} />
-                    <CopyField label="Số tài khoản" value={PAYMENT_CONFIG.accountNumber} />
-                    <CopyField label="Chủ tài khoản" value={PAYMENT_CONFIG.accountName} />
+                    <CopyField label="Ngân hàng" value={payment?.bankName || (payment?.bin ? `BIN ${payment.bin}` : '')} />
+                    <CopyField label="Số tài khoản" value={payment?.accountNumber} />
+                    <CopyField label="Chủ tài khoản" value={payment?.accountName} />
                     <CopyField label="Số tiền" value={String(amount)} />
-                    <CopyField label="Nội dung chuyển khoản" value={transferNote} />
+                    <CopyField label="Nội dung chuyển khoản" value={payment?.description} />
                   </div>
                 </div>
 
                 <p className="mt-5 rounded-[24px] border border-line bg-inner p-4 text-sm leading-[1.5] text-mute">
-                  Ghi <strong className="font-medium text-white">{transferNote}</strong> đúng trong nội dung chuyển khoản. Hệ thống tự xác nhận
-                  trong vài giây sau khi tiền về.
+                  Chuyển đúng <strong className="font-medium text-white">{formatVnd(amount)}</strong> với nội dung{' '}
+                  <strong className="font-medium text-white">{payment?.description}</strong>. Thanh toán qua payOS — hệ thống tự xác nhận trong vài
+                  giây sau khi tiền về.
+                  {payment?.checkoutUrl && (
+                    <>
+                      {' '}
+                      <a href={payment.checkoutUrl} target="_blank" rel="noreferrer" className="text-white underline decoration-dashed underline-offset-4 hover:opacity-70">
+                        Mở trang thanh toán payOS
+                      </a>
+                    </>
+                  )}
                 </p>
 
                 <div className="mt-5 flex flex-col gap-2 sm:flex-row">

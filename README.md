@@ -10,10 +10,10 @@ Landing page + trang thành viên + trang quản trị, chạy trên Cloudflare 
 ## Luồng mua hàng
 
 1. Khách bấm "Nhận Slot Beta" → đăng nhập Google → nhập tên + kênh liên hệ.
-2. API tạo đơn `AExxxxxx` (giá do server quyết định) → khách chuyển khoản với nội dung `AIEDITOR BETA AExxxxxx`.
-3. SePay gọi `POST /api/webhooks/sepay` → khớp mã đơn + đủ tiền → đơn `paid`. Modal checkout tự chuyển sang "Thanh toán thành công".
+2. API tạo đơn `AExxxxxx` (giá do server quyết định) và một link thanh toán payOS riêng cho đơn → modal hiện QR, số tài khoản, nội dung chuyển khoản (chính là mã đơn).
+3. payOS gọi `POST /api/webhooks/payos` (có chữ ký HMAC) → đủ tiền → đơn `paid`. Modal checkout tự chuyển sang "Thanh toán thành công". Khi khách bấm "Tôi đã chuyển khoản", server còn hỏi thẳng payOS phòng khi webhook bị lỡ.
 4. Khách vào `/account`: tải file Skill, hướng dẫn cài đặt, changelog, link nhóm Zalo/Discord.
-5. Giao dịch không khớp (ghi sai nội dung, chuyển thiếu) nằm ở `/admin` → "Giao dịch chưa khớp" để gắn tay vào đơn.
+5. Thanh toán không khớp đơn (chuyển thiếu, đơn đã huỷ, link thử) nằm ở `/admin` → "Giao dịch chưa khớp" để gắn tay vào đơn.
 
 ## Chạy local
 
@@ -27,12 +27,10 @@ npm run dev                      # Vite trên :5173, proxy /api → :8788
 
 Với `DEV_LOGIN=1`, trang đăng nhập có ô "Dev login" để vào bằng email bất kỳ mà không cần Google (chỉ có trong bản dev, chỉ chạy trên localhost).
 
-Giả lập SePay báo tiền về:
+Với `PAYOS_MOCK=1`, link thanh toán payOS là giả (QR hiện được nhưng không quét trả tiền được). Giả lập payOS báo tiền về, với `<payosOrderCode>` là `order.payment.orderCode`:
 
 ```bash
-curl -H 'Content-Type: application/json' -H 'Authorization: Apikey local-sepay-key' \
-  -d '{"id":1,"gateway":"MBBank","content":"AIEDITOR BETA AEXXXXXX","transferType":"in","transferAmount":349000}' \
-  http://localhost:8788/api/webhooks/sepay
+node scripts/simulate-payos-webhook.mjs <payosOrderCode> 349000
 ```
 
 ## Deploy lần đầu
@@ -45,12 +43,14 @@ curl -H 'Content-Type: application/json' -H 'Authorization: Apikey local-sepay-k
    ```
 2. **Google OAuth** — Google Cloud Console → APIs & Services → Credentials → OAuth client ID (Web application).
    Authorized redirect URIs: `https://<domain>/api/auth/google/callback` và `http://localhost:5173/api/auth/google/callback`.
-3. **SePay** — Tích hợp → Webhooks → URL `https://<domain>/api/webhooks/sepay`, kiểu chứng thực "API Key", chỉ nhận giao dịch tiền vào. Ghi lại API key.
+3. **payOS** — tại my.payos.vn tạo kênh thanh toán gắn tài khoản ngân hàng nhận tiền, lấy Client ID, API Key, Checksum Key.
 4. **Biến môi trường** — sửa `[vars]` trong `wrangler.toml` (ADMIN_EMAILS, link nhóm), rồi đặt secret:
    ```bash
    npx wrangler pages secret put GOOGLE_CLIENT_ID
    npx wrangler pages secret put GOOGLE_CLIENT_SECRET
-   npx wrangler pages secret put SEPAY_API_KEY
+   npx wrangler pages secret put PAYOS_CLIENT_ID
+   npx wrangler pages secret put PAYOS_API_KEY
+   npx wrangler pages secret put PAYOS_CHECKSUM_KEY
    ```
-5. **Tài khoản nhận tiền** — điền `PAYMENT_CONFIG` trong `src/App.jsx` để hiện mã VietQR.
-6. `npm run deploy`, rồi vào `/admin` → "Phiên bản" để tải file Skill đầu tiên lên.
+5. `npm run deploy`.
+6. Vào `/admin` → "Thử payOS" → **Đăng ký webhook với payOS**, rồi tạo một link thử nhỏ để kiểm tra; sau đó "Phiên bản" để tải file Skill đầu tiên lên.
