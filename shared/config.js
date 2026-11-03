@@ -8,12 +8,12 @@ export const BETA_SLOTS_TOTAL = 100;
 
 export const PRODUCT_NAME = 'Phiên Bản Thử Nghiệm (Beta Test)';
 
-// Order codes look like LB7K2QXM. The transfer note is "LORE BETA <code>";
+// Order codes look like AE7K2QXM. The transfer note is "AIEDITOR BETA <code>";
 // banks often strip spaces, so the webhook matches the code anywhere in the content.
-export const ORDER_PREFIX = 'LB';
+export const ORDER_PREFIX = 'AE';
 export const ORDER_CODE_LENGTH = 6;
 export const ORDER_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-export const transferNoteFor = (code) => `LORE BETA ${code}`;
+export const transferNoteFor = (code) => `AIEDITOR BETA ${code}`;
 
 export const CONTACT_METHOD_IDS = ['email', 'zalo', 'discord'];
 

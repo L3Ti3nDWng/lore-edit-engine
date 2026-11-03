@@ -1,4 +1,4 @@
--- Lore Edit Engine: users, sessions, orders, bank transactions, releases.
+-- AI EDITOR: users, sessions, orders, bank transactions, releases.
 
 CREATE TABLE users (
   id TEXT PRIMARY KEY,

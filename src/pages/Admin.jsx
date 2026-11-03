@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Check, FileArchive, Link2, Loader2, Search, Trash2, Upload, X } from 'lucide-react';
+import { Check, FileArchive, Link2, Loader2, Search, Send, Trash2, Upload, X } from 'lucide-react';
+import { BETA_PRICE } from '../../shared/config.js';
 import { api, useMe } from '../lib/api.js';
 import { DevSignIn, GoogleSignInButton } from '../SignIn.jsx';
 import { PillButton, formatVnd, inputClass } from '../ui.jsx';
@@ -9,6 +10,7 @@ const TABS = [
   { id: 'orders', label: 'Đơn hàng' },
   { id: 'transactions', label: 'Giao dịch chưa khớp' },
   { id: 'releases', label: 'Phiên bản' },
+  { id: 'sepay', label: 'Thử SePay' },
 ];
 
 const ORDER_FILTERS = [
@@ -268,7 +270,7 @@ function TransactionsTab() {
                     autoFocus
                     value={code}
                     onChange={(e) => setCode(e.target.value)}
-                    placeholder="Mã đơn, ví dụ LB7K2QXM"
+                    placeholder="Mã đơn, ví dụ AE7K2QXM"
                     className={`${inputClass(false)} !mt-0 font-mono uppercase`}
                   />
                   <PillButton type="submit" size="sm" disabled={!code.trim()}>
@@ -280,6 +282,221 @@ function TransactionsTab() {
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* SePay tester                                                        */
+/* ------------------------------------------------------------------ */
+
+// [title, tone] per outcome from POST /api/admin/sepay-test.
+const SEPAY_OUTCOMES = {
+  paid: ['Khớp đơn — đủ tiền', 'ok'],
+  underpaid: ['Khớp đơn — chuyển thiếu tiền', 'warn'],
+  already_paid: ['Đơn này đã thanh toán trước đó', 'warn'],
+  cancelled: ['Đơn này đã bị huỷ', 'warn'],
+  no_order: ['Có mã đơn nhưng không tìm thấy đơn', 'bad'],
+  no_code: ['Không tìm thấy mã đơn trong nội dung', 'bad'],
+  duplicate: ['Giao dịch trùng — đã xử lý trước đó', 'warn'],
+  ignored: ['Bỏ qua (không phải tiền vào)', 'warn'],
+};
+
+const TONE_CLASS = {
+  ok: 'border-accent/60 bg-accent/10',
+  warn: 'border-amber-400/50 bg-amber-400/10',
+  bad: 'border-rose-400/60 bg-rose-400/10',
+};
+
+function outcomeDetail(r) {
+  const { outcome, order, commit, note, codes } = r;
+  if (outcome === 'paid') return commit ? `Đơn ${order.code} đã được kích hoạt. Khách thấy "Thanh toán thành công" trong vài giây.` : `Đơn ${order.code} sẽ được kích hoạt nếu tiền về với nội dung này.`;
+  if (outcome === 'no_order') return `Tìm thấy ${codes.join(', ')} nhưng không có đơn nào mang mã này.`;
+  if (outcome === 'no_code') return commit ? 'Giao dịch đã lưu vào tab "Giao dịch chưa khớp" để gắn tay.' : 'Giao dịch sẽ nằm ở tab "Giao dịch chưa khớp" để admin gắn tay.';
+  return note;
+}
+
+function SepayTestTab() {
+  const [status, setStatus] = useState(null);
+  const [pending, setPending] = useState([]);
+  const [amount, setAmount] = useState(String(BETA_PRICE));
+  const [content, setContent] = useState('');
+  const [commit, setCommit] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [results, setResults] = useState([]);
+
+  const load = useCallback(async () => {
+    try {
+      const [s, o] = await Promise.all([api('/admin/sepay-test'), api('/admin/orders?status=pending')]);
+      setStatus(s);
+      setPending(o.orders.slice(0, 6));
+    } catch (err) {
+      setError(err.message);
+    }
+  }, []);
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (commit && !window.confirm(`Ghi thật giao dịch ${formatVnd(Number(amount) || 0)}? Nếu khớp, đơn sẽ được kích hoạt như khi tiền về thật.`)) return;
+    setBusy(true);
+    setError('');
+    try {
+      const r = await api('/admin/sepay-test', { method: 'POST', body: { amount: Number(amount), content, commit } });
+      setResults((list) => [{ ...r, amount: Number(amount), content, at: Date.now() }, ...list].slice(0, 5));
+      if (commit) load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const parsedAmount = Number(amount);
+
+  return (
+    <div className="grid gap-5 lg:grid-cols-[420px_1fr] lg:items-start">
+      <div className="space-y-3">
+        <div className="rounded-[24px] border border-line bg-card p-5 text-sm">
+          <p className="font-medium text-white">Kết nối SePay</p>
+          {!status ? (
+            <p className="mt-2 text-mute">Đang kiểm tra...</p>
+          ) : (
+            <dl className="mt-3 space-y-2">
+              <div className="flex justify-between gap-4">
+                <dt className="text-mute">SEPAY_API_KEY</dt>
+                <dd className={status.apiKeyConfigured ? 'text-accent' : 'text-rose-300'}>{status.apiKeyConfigured ? 'Đã cấu hình' : 'Chưa cấu hình'}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="shrink-0 text-mute">Webhook thật gần nhất</dt>
+                <dd className="min-w-0 truncate text-right text-white">
+                  {status.lastWebhook ? `${formatDateTime(status.lastWebhook.receivedAt)} · ${formatVnd(status.lastWebhook.amount)}` : 'Chưa nhận lần nào'}
+                </dd>
+              </div>
+            </dl>
+          )}
+        </div>
+
+        <form onSubmit={submit} className="space-y-4 rounded-[32px] border border-line bg-card p-6">
+          <p className="text-lg font-medium tracking-tightish text-white">Gửi giao dịch thử</p>
+
+          {pending.length > 0 && (
+            <div>
+              <p className="text-sm text-mute">Điền nhanh từ đơn đang chờ</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {pending.map((o) => (
+                  <SmallButton
+                    key={o.code}
+                    onClick={() => {
+                      setAmount(String(o.amount));
+                      setContent(o.transferNote);
+                    }}
+                  >
+                    <span className="font-mono">{o.code}</span> · {o.name}
+                  </SmallButton>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div>
+            <label htmlFor="st-amount" className="text-sm text-mute">
+              Số tiền (VND)
+            </label>
+            <input
+              id="st-amount"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value.replace(/[^\d]/g, ''))}
+              inputMode="numeric"
+              required
+              className={inputClass(false)}
+            />
+            <p className="mt-1.5 text-xs text-mute">{parsedAmount > 0 ? formatVnd(parsedAmount) : 'Nhập số tiền'}</p>
+          </div>
+
+          <div>
+            <label htmlFor="st-content" className="text-sm text-mute">
+              Nội dung chuyển khoản
+            </label>
+            <textarea
+              id="st-content"
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              rows={3}
+              required
+              maxLength={500}
+              placeholder="MBVCB.123456 AIEDITOR BETA AE7K2QXM chuyen tien"
+              className={`${inputClass(false)} font-mono text-sm`}
+            />
+            <p className="mt-1.5 text-xs text-mute">Ghi như ngân hàng gửi về — có thể viết thường, dính liền hoặc kèm chữ thừa.</p>
+          </div>
+
+          <div>
+            <span className="text-sm text-mute">Chế độ</span>
+            <div className="mt-2 grid grid-cols-2 gap-2" role="radiogroup" aria-label="Chế độ thử">
+              <Chip active={!commit} onClick={() => setCommit(false)}>
+                Chạy thử
+              </Chip>
+              <Chip active={commit} onClick={() => setCommit(true)}>
+                Ghi thật
+              </Chip>
+            </div>
+            <p className={`mt-2 text-xs leading-[1.5] ${commit ? 'text-amber-300' : 'text-mute'}`}>
+              {commit
+                ? 'Lưu giao dịch (cổng TEST) và kích hoạt đơn nếu khớp — y như tiền về thật. Doanh thu sẽ tính cả giao dịch này.'
+                : 'Chỉ xem hệ thống sẽ khớp thế nào, không ghi gì vào database.'}
+            </p>
+          </div>
+
+          <ErrorNote error={error} />
+          <PillButton type="submit" disabled={busy || !(parsedAmount > 0) || !content.trim()} className="w-full">
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            {commit ? 'Gửi và ghi thật' : 'Chạy thử'}
+          </PillButton>
+        </form>
+      </div>
+
+      <div className="min-w-0">
+        {!results.length ? (
+          <p className="rounded-[24px] border border-dashed border-line2 p-8 text-center text-sm text-mute">Kết quả các lần thử sẽ hiện ở đây.</p>
+        ) : (
+          <ul className="space-y-2.5" aria-live="polite">
+            {results.map((r) => {
+              const [title, tone] = SEPAY_OUTCOMES[r.outcome] || [r.outcome, 'warn'];
+              return (
+                <li key={r.at} className={`rounded-[24px] border p-5 ${TONE_CLASS[tone]}`}>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="font-medium text-white">{title}</p>
+                    <span className="rounded-full border border-line2 px-2 py-0.5 text-[11px] text-mute">{r.commit ? 'Đã ghi thật' : 'Chạy thử'}</span>
+                  </div>
+                  <p className="mt-1 text-sm leading-[1.5] text-white/85">{outcomeDetail(r)}</p>
+                  <dl className="mt-3 space-y-1 border-t border-white/10 pt-3 text-xs">
+                    <div className="flex gap-3">
+                      <dt className="w-20 shrink-0 text-mute">Số tiền</dt>
+                      <dd className="text-white">{formatVnd(r.amount)}</dd>
+                    </div>
+                    <div className="flex gap-3">
+                      <dt className="w-20 shrink-0 text-mute">Nội dung</dt>
+                      <dd className="min-w-0 break-words font-mono text-white">{r.content}</dd>
+                    </div>
+                    {r.order && (
+                      <div className="flex gap-3">
+                        <dt className="w-20 shrink-0 text-mute">Đơn</dt>
+                        <dd className="min-w-0 text-white">
+                          <span className="font-mono">{r.order.code}</span> · {r.order.name} · cần {formatVnd(r.order.amount)}
+                        </dd>
+                      </div>
+                    )}
+                  </dl>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }
@@ -410,7 +627,7 @@ export default function Admin() {
   const [tab, setTab] = useState('orders');
 
   useEffect(() => {
-    document.title = 'Quản trị — Lore Edit Engine';
+    document.title = 'Quản trị — AI EDITOR';
   }, []);
 
   let body;
@@ -455,6 +672,7 @@ export default function Admin() {
           {tab === 'orders' && <OrdersTab />}
           {tab === 'transactions' && <TransactionsTab />}
           {tab === 'releases' && <ReleasesTab />}
+          {tab === 'sepay' && <SepayTestTab />}
         </div>
       </>
     );

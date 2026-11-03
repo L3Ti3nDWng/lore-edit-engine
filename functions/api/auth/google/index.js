@@ -1,6 +1,6 @@
 import { HttpError, cookie, randomToken, safeNext } from '../../../../server/http.js';
 
-export const OAUTH_COOKIE = 'lore_oauth';
+export const OAUTH_COOKIE = 'ai_editor_oauth';
 
 export const redirectUri = (env, request) => `${env.PUBLIC_ORIGIN || new URL(request.url).origin}/api/auth/google/callback`;
 

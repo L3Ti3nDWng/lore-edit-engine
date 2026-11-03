@@ -52,10 +52,11 @@ export function PillButton({ children, variant = 'light', size = 'md', className
   );
 }
 
+// Wordmark. `size` is the legacy script-logo size; the sans wordmark renders at 80% of it.
 export function Logo({ size = 26 }) {
   return (
-    <span className="font-script leading-[1.2] tracking-tightish text-white" style={{ fontSize: size }}>
-      Lore
+    <span className="whitespace-nowrap font-bold uppercase leading-[1.2] tracking-[-0.03em] text-white" style={{ fontSize: Math.round(size * 0.8) }}>
+      AI <span className="text-accent">Editor</span>
     </span>
   );
 }

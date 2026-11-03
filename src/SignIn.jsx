@@ -24,7 +24,7 @@ export function GoogleSignInButton({ next, className = '', children = 'Tiáº¿p tá
 // Local development only (stripped from production builds): sign in as any email
 // through POST /api/auth/dev, which also requires DEV_LOGIN=1 on the API.
 export function DevSignIn({ onDone }) {
-  const [email, setEmail] = useState('buyer@lore.test');
+  const [email, setEmail] = useState('buyer@aieditor.test');
   const [error, setError] = useState('');
   if (!import.meta.env.DEV) return null;
   const submit = async (e) => {

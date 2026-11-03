@@ -14,7 +14,7 @@ const INSTALL_STEPS = [
   {
     title: 'Giải nén vào thư mục Skill',
     desc: 'Giải nén toàn bộ thư mục vào đường dẫn dưới đây (tạo thư mục nếu chưa có).',
-    code: '~/.claude/skills/lore-edit-engine/',
+    code: '~/.claude/skills/ai-editor/',
   },
   {
     title: 'Cài FFmpeg',
@@ -330,7 +330,7 @@ export default function Account() {
   }, [waiting, reload]);
 
   useEffect(() => {
-    document.title = 'Trang thành viên — Lore Edit Engine';
+    document.title = 'Trang thành viên — AI EDITOR';
   }, []);
 
   let body;

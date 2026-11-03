@@ -5,7 +5,6 @@ export default {
     extend: {
       fontFamily: {
         sans: ['"Google Sans"', '"DM Sans"', 'system-ui', 'sans-serif'],
-        script: ['"Lily Script One"', 'cursive'],
         mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
       },
       colors: {

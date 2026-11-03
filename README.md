@@ -1,4 +1,4 @@
-# Lore Edit Engine
+# AI EDITOR
 
 Landing page + trang thành viên + trang quản trị, chạy trên Cloudflare Pages.
 
@@ -10,7 +10,7 @@ Landing page + trang thành viên + trang quản trị, chạy trên Cloudflare 
 ## Luồng mua hàng
 
 1. Khách bấm "Nhận Slot Beta" → đăng nhập Google → nhập tên + kênh liên hệ.
-2. API tạo đơn `LBxxxxxx` (giá do server quyết định) → khách chuyển khoản với nội dung `LORE BETA LBxxxxxx`.
+2. API tạo đơn `AExxxxxx` (giá do server quyết định) → khách chuyển khoản với nội dung `AIEDITOR BETA AExxxxxx`.
 3. SePay gọi `POST /api/webhooks/sepay` → khớp mã đơn + đủ tiền → đơn `paid`. Modal checkout tự chuyển sang "Thanh toán thành công".
 4. Khách vào `/account`: tải file Skill, hướng dẫn cài đặt, changelog, link nhóm Zalo/Discord.
 5. Giao dịch không khớp (ghi sai nội dung, chuyển thiếu) nằm ở `/admin` → "Giao dịch chưa khớp" để gắn tay vào đơn.
@@ -31,7 +31,7 @@ Giả lập SePay báo tiền về:
 
 ```bash
 curl -H 'Content-Type: application/json' -H 'Authorization: Apikey local-sepay-key' \
-  -d '{"id":1,"gateway":"MBBank","content":"LORE BETA LBXXXXXX","transferType":"in","transferAmount":349000}' \
+  -d '{"id":1,"gateway":"MBBank","content":"AIEDITOR BETA AEXXXXXX","transferType":"in","transferAmount":349000}' \
   http://localhost:8788/api/webhooks/sepay
 ```
 
@@ -39,8 +39,8 @@ curl -H 'Content-Type: application/json' -H 'Authorization: Apikey local-sepay-k
 
 1. **D1 + R2**
    ```bash
-   npx wrangler d1 create lore-edit-engine        # chép database_id vào wrangler.toml
-   npx wrangler r2 bucket create lore-edit-engine-files
+   npx wrangler d1 create ai-editor               # chép database_id vào wrangler.toml
+   npx wrangler r2 bucket create ai-editor-files
    npm run db:migrate:remote
    ```
 2. **Google OAuth** — Google Cloud Console → APIs & Services → Credentials → OAuth client ID (Web application).

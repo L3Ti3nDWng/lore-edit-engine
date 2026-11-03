@@ -397,7 +397,7 @@ function Navbar({ onCheckout, me }) {
       }`}
     >
       <nav className="relative mx-auto flex h-[81px] max-w-[1440px] items-center justify-between px-5 md:px-10" aria-label="Điều hướng chính">
-        <a href="#top" aria-label="Lore Edit Engine — về đầu trang">
+        <a href="#top" aria-label="AI EDITOR — về đầu trang">
           <Logo />
         </a>
 
@@ -1012,7 +1012,7 @@ function WorkspaceWindow() {
           <div className="mt-auto flex items-center gap-2 pt-10">
             <span className="flex h-[27px] w-[27px] items-center justify-center rounded-full border border-line bg-card text-[10px] text-mute">B</span>
             <div className="text-[10px] font-medium leading-[1.2] tracking-tightish">
-              <p className="text-white">beta@lore.vn</p>
+              <p className="text-white">beta@aieditor.vn</p>
               <p className="text-mute">Beta · Vĩnh viễn</p>
             </div>
           </div>
@@ -1792,7 +1792,7 @@ function Footer() {
         </div>
 
         <div className="mt-[120px] flex flex-col gap-3 text-base font-medium tracking-tightish text-mute sm:flex-row sm:justify-between">
-          <span>© {new Date().getFullYear()} Lore Edit Engine.</span>
+          <span>© {new Date().getFullYear()} AI EDITOR.</span>
           <a href="#top" className="text-white underline decoration-dashed underline-offset-4 transition-opacity hover:opacity-60">
             Về đầu trang
           </a>

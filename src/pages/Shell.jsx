@@ -33,7 +33,7 @@ export function Shell({ me, active, children }) {
       <GlobalStyles />
       <header className="border-b border-line bg-base/80 backdrop-blur-xl">
         <nav className="mx-auto flex h-[81px] max-w-[1200px] items-center justify-between gap-4 px-4 md:px-8" aria-label="Điều hướng tài khoản">
-          <a href="/" aria-label="Về trang chủ Lore Edit Engine">
+          <a href="/" aria-label="Về trang chủ AI EDITOR">
             <Logo />
           </a>
           {user && (

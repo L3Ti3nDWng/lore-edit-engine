@@ -1,6 +1,6 @@
 import { HttpError, cookie, now, parseCookies, randomToken, sha256Hex } from './http.js';
 
-export const SESSION_COOKIE = 'lore_session';
+export const SESSION_COOKIE = 'ai_editor_session';
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 export async function getSessionUser(env, request) {

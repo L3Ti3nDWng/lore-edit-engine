@@ -1,4 +1,4 @@
-name = "lore-edit-engine"
+name = "ai-editor"
 pages_build_output_dir = "dist"
 compatibility_date = "2026-10-01"
 
@@ -14,11 +14,11 @@ SUPPORT_DISCORD_URL = ""
 
 [[d1_databases]]
 binding = "DB"
-database_name = "lore-edit-engine"
-# Replace with the id printed by `npx wrangler d1 create lore-edit-engine`.
+database_name = "ai-editor"
+# Replace with the id printed by `npx wrangler d1 create ai-editor`.
 database_id = "00000000-0000-0000-0000-000000000000"
 migrations_dir = "migrations"
 
 [[r2_buckets]]
 binding = "FILES"
-bucket_name = "lore-edit-engine-files"
+bucket_name = "ai-editor-files"
