@@ -17,6 +17,9 @@ export default {
         mute: '#C2C2C2',
         accent: '#04B8E0',
       },
+      transitionTimingFunction: {
+        silk: 'cubic-bezier(0.16, 1, 0.3, 1)',
+      },
       letterSpacing: {
         tightish: '-0.02em',
       },

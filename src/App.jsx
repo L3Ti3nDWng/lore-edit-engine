@@ -37,6 +37,28 @@ import {
 import { BETA_PRICE, BETA_SLOTS_TOTAL, CONTACT_VALIDATORS, OFFICIAL_PRICE, PRODUCT_NAME, ULTIMATE_PRICE } from '../shared/config.js';
 import { api, useMe, useSlots } from './lib/api.js';
 import PayosQr from './PayosQr.jsx';
+import {
+  CountUp,
+  Glyph,
+  Magnetic,
+  ParallaxMedia,
+  Reveal,
+  ScrollTrigger,
+  SlideArrow,
+  Stagger,
+  TiltCard,
+  Words,
+  gsap,
+  motionOK,
+  scrollLock,
+  scrollToId,
+  scrollToY,
+  trackGlow,
+  useGSAP,
+  useGlyphs,
+  useSmoothScroll,
+  useWordReveal,
+} from './motion.jsx';
 import { DevSignIn, GoogleSignInButton } from './SignIn.jsx';
 import { Container, CopyField, GlobalStyles, Logo, PillButton, formatVnd, inputClass } from './ui.jsx';
 
@@ -246,32 +268,6 @@ const CONTACT_METHODS = [
 /* Helpers & hooks                                                     */
 /* ------------------------------------------------------------------ */
 
-const scrollToId = (id) => {
-  const el = document.getElementById(id);
-  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-};
-
-function useInView(threshold = 0.2) {
-  const ref = useRef(null);
-  const [inView, setInView] = useState(false);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return undefined;
-    const io = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setInView(true);
-          io.disconnect();
-        }
-      },
-      { threshold }
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, [threshold]);
-  return [ref, inView];
-}
-
 function useLoopingTypewriter(text, speed = 55, hold = 1800) {
   const [count, setCount] = useState(0);
   useEffect(() => {
@@ -309,46 +305,30 @@ function useLoopingProgress(step = 1, interval = 70, pause = 1400) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Global styles (keyframes)                                           */
-/* ------------------------------------------------------------------ */
-
-/* ------------------------------------------------------------------ */
 /* Primitives                                                          */
 /* ------------------------------------------------------------------ */
 
-function Reveal({ children, className = '', delay = 0 }) {
-  const [ref, inView] = useInView(0.12);
+function Heading({ children, className = '', as: Tag = 'h2' }) {
+  const ref = useRef(null);
+  useWordReveal(ref);
   return (
-    <div
-      ref={ref}
-      className={`transition-[opacity,transform,filter] duration-[900ms] ease-[cubic-bezier(.2,.8,.2,1)] ${
-        inView ? 'translate-y-0 opacity-100 blur-0' : 'translate-y-5 opacity-0 blur-[8px]'
-      } ${className}`}
-      style={{ transitionDelay: `${delay}ms` }}
-    >
+    <Tag ref={ref} className={`text-[32px] font-bold leading-[1.15] tracking-[-0.03em] text-white md:text-[40px] lg:text-[48px] ${className}`}>
       {children}
-    </div>
+    </Tag>
   );
 }
 
-function Heading({ children, className = '' }) {
+function PhotoCard({ image, className = '', overlay = 'bg-black/35', position = 'center', parallax = true, children, ...rest }) {
+  const zoom = 'transition-transform duration-[1400ms] ease-silk group-hover:scale-[1.04]';
   return (
-    <h2 className={`text-[32px] font-medium leading-[1.2] tracking-tightish text-white md:text-[36px] lg:text-[44px] ${className}`}>
-      {children}
-    </h2>
-  );
-}
-
-function PhotoCard({ image, className = '', overlay = 'bg-black/35', position = 'center', children }) {
-  return (
-    <div className={`group relative overflow-hidden rounded-[32px] border border-line bg-card ${className}`}>
-      <img
-        src={media(image)}
-        alt=""
-        loading="lazy"
-        className="absolute inset-0 h-full w-full object-cover transition-transform duration-[1400ms] ease-[cubic-bezier(.2,.8,.2,1)] group-hover:scale-[1.06]"
-        style={{ objectPosition: position }}
-      />
+    <div className={`group relative overflow-hidden rounded-[32px] border border-line bg-card ${className}`} {...rest}>
+      {parallax ? (
+        <ParallaxMedia src={media(image)} imgClassName={zoom} style={{ objectPosition: position }} />
+      ) : (
+        <div data-card-media className="pointer-events-none absolute inset-y-0 -inset-x-[10%] will-change-transform">
+          <img src={media(image)} alt="" loading="lazy" className={`h-full w-full object-cover ${zoom}`} style={{ objectPosition: position }} />
+        </div>
+      )}
       <div className={`absolute inset-0 ${overlay}`} />
       <div className="relative h-full">{children}</div>
     </div>
@@ -363,6 +343,7 @@ function Navbar({ onCheckout, me }) {
   const accountLabel = me?.user ? 'Tài khoản' : 'Đăng nhập';
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
+  const ref = useRef(null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
@@ -371,20 +352,29 @@ function Navbar({ onCheckout, me }) {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
+  useGSAP(
+    () => {
+      if (!motionOK()) return;
+      gsap.from('[data-nav-item]', { y: -24, autoAlpha: 0, duration: 1.1, ease: 'silk', stagger: 0.05, delay: 0.1 });
+    },
+    { scope: ref }
+  );
+
   return (
     <header
-      className={`fixed inset-x-0 top-0 z-50 transition-[background-color,backdrop-filter] duration-500 ${
-        scrolled || open ? 'bg-base/80 backdrop-blur-xl' : 'bg-transparent'
+      ref={ref}
+      className={`fixed inset-x-0 top-0 z-50 border-b transition-[background-color,backdrop-filter,border-color] duration-500 ${
+        scrolled || open ? 'border-line bg-base/80 backdrop-blur-xl' : 'border-transparent bg-transparent'
       }`}
     >
       <nav className="relative mx-auto flex h-[81px] max-w-[1440px] items-center justify-between px-5 md:px-10" aria-label="Điều hướng chính">
-        <a href="#top" aria-label="AI EDITOR — về đầu trang">
+        <a href="#top" aria-label="AI EDITOR — về đầu trang" data-nav-item>
           <Logo />
         </a>
 
-        <div className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-6 lg:flex xl:gap-8">
+        <div className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-6 lg:flex xl:gap-9">
           {NAV_LINKS.map((l) => (
-            <a key={l.href} href={l.href} className="text-base tracking-[0.01em] text-white transition-opacity hover:opacity-60">
+            <a key={l.href} href={l.href} data-nav-item className="link-draw text-base tracking-[0.01em] text-mute transition-colors duration-300 hover:text-white">
               {l.label}
             </a>
           ))}
@@ -394,7 +384,8 @@ function Navbar({ onCheckout, me }) {
           <a
             href="/account"
             aria-label={accountLabel}
-            className="inline-flex items-center gap-2 text-base font-medium tracking-tightish text-white transition-opacity hover:opacity-60"
+            data-nav-item
+            className="link-draw inline-flex items-center gap-2 text-base font-medium tracking-tightish text-white"
           >
             {me?.user?.avatarUrl ? (
               <img src={me.user.avatarUrl} alt="" referrerPolicy="no-referrer" className="h-6 w-6 rounded-full border border-line2" />
@@ -406,18 +397,24 @@ function Navbar({ onCheckout, me }) {
           </a>
           <button
             type="button"
+            data-nav-item
             onClick={() => scrollToId('workflow')}
-            className="text-base font-medium tracking-tightish text-white transition-opacity hover:opacity-60"
+            className="link-draw text-base font-medium tracking-tightish text-white"
           >
             Xem demo
           </button>
-          <PillButton size="sm" onClick={onCheckout}>
-            Nhận Slot Beta
-          </PillButton>
+          <span data-nav-item>
+            <Magnetic>
+              <PillButton size="sm" variant="dark" onClick={onCheckout}>
+                Nhận Slot Beta
+              </PillButton>
+            </Magnetic>
+          </span>
         </div>
 
         <button
           type="button"
+          data-nav-item
           className="flex h-10 w-10 flex-col items-center justify-center gap-[6px] lg:hidden"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
@@ -454,60 +451,110 @@ function Navbar({ onCheckout, me }) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Hero                                                                */
+/* Hero — split: copy left, framed media right (Figma hero)            */
 /* ------------------------------------------------------------------ */
 
 function Hero() {
+  const ref = useRef(null);
+
+  useGSAP(
+    () => {
+      if (!motionOK()) return;
+      const tl = gsap.timeline({ defaults: { ease: 'silk' }, delay: 0.2 });
+      tl.from('[data-hero-badge]', { y: 24, autoAlpha: 0, duration: 1.1 })
+        .from('[data-hero-title] [data-word]', { yPercent: 115, duration: 1.4, stagger: 0.06 }, '<0.08')
+        .from('[data-hero-copy]', { y: 28, autoAlpha: 0, duration: 1.2 }, '<0.45')
+        .from('[data-hero-cta] > *', { y: 28, autoAlpha: 0, duration: 1.1, stagger: 0.09 }, '<0.12')
+        .from('[data-hero-frame]', { autoAlpha: 0, scale: 0.86, rotation: (i) => (i ? 20 : -16), duration: 1.8, stagger: 0.12 }, 0.15)
+        .from('[data-hero-media]', { autoAlpha: 0, duration: 1.2 }, 0.35)
+        .fromTo('[data-hero-media] img', { scale: 1.1 }, { scale: 1, duration: 2.2 }, 0.35)
+        .from('[data-hero-chip]', { y: 20, autoAlpha: 0, duration: 1, stagger: 0.1 }, 0.9);
+
+      // Scroll-out: the visual sinks slower than the copy, giving depth.
+      const out = { trigger: ref.current, start: 'top top', end: 'bottom top', scrub: true };
+      gsap.to('[data-hero-visual]', { yPercent: 14, ease: 'none', scrollTrigger: out });
+      gsap.to('[data-hero-text]', { yPercent: -8, autoAlpha: 0.15, ease: 'none', scrollTrigger: out });
+    },
+    { scope: ref }
+  );
+
   return (
-    <section id="top" className="relative flex min-h-[760px] items-center overflow-hidden md:h-[900px]">
-      <div className="pointer-events-none absolute inset-0">
-        <img
-          src={media('hero')}
-          alt=""
-          className="anim-hero absolute inset-0 h-full w-full object-cover brightness-[.62] contrast-[1.15] saturate-[.75] [mask-image:radial-gradient(circle_at_54%_50%,#000_0%,#000_26%,transparent_52%)]"
-        />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_54%_52%,transparent_32%,rgba(10,10,10,0.5)_52%,#0a0a0a_72%)]" />
-        {/* Porthole glass rim */}
-        <div className="absolute left-[54%] top-1/2 aspect-square w-[min(1000px,140vw)] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/[0.06] shadow-[inset_0_0_120px_40px_rgba(10,10,10,0.9),inset_0_0_0_18px_rgba(255,255,255,0.015)]" />
-        <div className="absolute inset-y-0 left-0 w-full bg-gradient-to-r from-base/80 via-base/25 to-transparent md:w-2/3" />
+    <section id="top" ref={ref} className="relative flex min-h-[100svh] items-center overflow-hidden pb-20 pt-[120px] lg:pb-16">
+      {/* Ambient glows (Figma hero gradient, in the brand accent). */}
+      <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+        <div className="absolute -left-[20%] -top-[30%] h-[80vh] w-[70vw] rounded-full bg-[radial-gradient(closest-side,rgba(4,184,224,0.16),transparent)]" />
+        <div className="absolute -right-[10%] bottom-[-20%] h-[60vh] w-[50vw] rounded-full bg-[radial-gradient(closest-side,rgba(4,184,224,0.08),transparent)]" />
         <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-base to-transparent" />
       </div>
 
-      <Container className="relative pt-16">
-        <Reveal>
+      <Container className="relative grid items-center gap-14 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] lg:gap-10">
+        <div data-hero-text>
           <button
             type="button"
+            data-hero-badge
             onClick={() => scrollToId('pricing')}
-            className="group inline-flex max-w-full items-center gap-2 rounded-full bg-base/80 px-4 py-1.5 text-sm tracking-tightish backdrop-blur-md"
+            className="group inline-flex max-w-full items-center gap-2 rounded-full border border-line bg-base/80 px-4 py-1.5 text-sm tracking-tightish backdrop-blur-md transition-colors duration-500 hover:border-line2"
           >
             <span className="font-medium text-accent">Mới</span>
             <span className="h-[18px] w-px bg-line2" />
             <span className="truncate text-white">Mở cổng Beta Test giới hạn (Ưu đãi 349.000đ)</span>
-            <ChevronRight className="h-4 w-4 shrink-0 text-white transition-transform group-hover:translate-x-0.5" />
+            <ChevronRight className="h-4 w-4 shrink-0 text-white transition-transform duration-500 ease-silk group-hover:translate-x-1" />
           </button>
-        </Reveal>
 
-        <Reveal delay={100}>
-          <h1 className="mt-[18px] max-w-[600px] text-[40px] font-medium leading-[1.2] tracking-tightish text-white md:text-[54px]">
-            Tự động hóa quy trình Edit Video <span className="text-mute">với trí tuệ nhân tạo</span>
+          <h1
+            data-hero-title
+            className="mt-6 max-w-[640px] text-[40px] font-bold leading-[1.12] tracking-[-0.03em] text-white sm:text-[52px] lg:text-[60px] xl:text-[68px]"
+          >
+            <Words>Tự động hóa quy trình Edit Video</Words>{' '}
+            <span className="text-mute">
+              <Words>với trí tuệ nhân tạo</Words>
+            </span>
           </h1>
-        </Reveal>
 
-        <Reveal delay={180}>
-          <p className="mt-5 max-w-[520px] text-lg leading-[1.4] text-mute">
+          <p data-hero-copy className="mt-6 max-w-[520px] text-lg leading-[1.5] text-mute">
             Trích xuất Style DNA từ bất kỳ video mẫu nào, áp dụng kỹ thuật Liquid Choreography và xuất trực tiếp timeline
             CapCut, Premiere Pro hoặc MP4 4K chỉ với một câu lệnh.
           </p>
-        </Reveal>
 
-        <Reveal delay={260}>
-          <div className="mt-7 flex flex-wrap items-center gap-2.5">
-            <PillButton onClick={() => scrollToId('pricing')}>Sở hữu Slot Beta — 349k</PillButton>
+          <div data-hero-cta className="mt-9 flex flex-wrap items-center gap-3">
+            <Magnetic>
+              <PillButton size="lg" onClick={() => scrollToId('pricing')}>
+                Sở hữu Slot Beta — 349k <SlideArrow />
+              </PillButton>
+            </Magnetic>
             <PillButton variant="dark" size="lg" onClick={() => scrollToId('workflow')}>
               Xem quy trình hoạt động
             </PillButton>
           </div>
-        </Reveal>
+        </div>
+
+        {/* Framed media with offset outline squares, as in the Figma hero. */}
+        <div data-hero-visual className="relative mx-auto aspect-square w-full max-w-[400px] sm:max-w-[480px] lg:max-w-[560px]">
+          <div data-hero-frame className="absolute inset-[9%] rotate-[-9deg] rounded-[48px] border border-white/15" />
+          <div data-hero-frame className="absolute inset-[11%] rotate-[7deg] rounded-[48px] border border-accent/30 bg-accent/[0.07]" />
+          <div data-hero-media className="absolute inset-[10%] overflow-hidden rounded-[44px] border border-line2 bg-card shadow-[0_50px_120px_-30px_rgba(0,0,0,0.9)]">
+            <img src={media('hero')} alt="" className="h-full w-full object-cover brightness-[.8] contrast-[1.1] saturate-[.85] will-change-transform" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+          </div>
+
+          <span
+            data-hero-chip
+            className="absolute bottom-[14%] left-0 inline-flex items-center gap-2 rounded-full border border-line2 bg-base/85 px-4 py-2 text-sm font-medium tracking-tightish text-white backdrop-blur-md sm:left-[-2%]"
+          >
+            <Dna className="h-4 w-4 text-accent" /> Style DNA
+          </span>
+          <span
+            data-hero-chip
+            className="absolute right-0 top-[16%] inline-flex items-center gap-2 rounded-full border border-line2 bg-base/85 px-4 py-2 text-sm font-medium tracking-tightish text-white backdrop-blur-md sm:right-[-2%]"
+          >
+            <MonitorPlay className="h-4 w-4 text-accent" /> MP4 4K
+          </span>
+
+          <Glyph type="zigzag" className="left-[2%] top-[4%]" />
+          <Glyph type="rings" className="right-[4%] top-0" />
+          <Glyph type="play" className="bottom-[2%] left-[10%]" />
+          <Glyph type="plus" className="bottom-[8%] right-[6%]" />
+        </div>
       </Container>
     </section>
   );
@@ -636,35 +683,45 @@ function ExportMockup() {
   );
 }
 
+// Figma "The Service We Provide": centred heading between glyphs, then a grid of
+// centred items, each led by a tinted badge.
 function Workflow() {
   const mockups = [<ExtractMockup key="1" />, <ChoreographMockup key="2" />, <ExportMockup key="3" />];
   return (
-    <section id="workflow" className="scroll-mt-10 py-[120px]">
-      <Container>
-        <Reveal className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+    <section id="workflow" className="relative scroll-mt-10 py-[120px]">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-[60%] bg-[radial-gradient(ellipse_at_top,rgba(4,184,224,0.07),transparent_60%)]" aria-hidden="true" />
+      <Container className="relative">
+        <div className="relative mx-auto flex max-w-[980px] flex-col items-center text-center">
+          <Glyph type="play" className="-left-4 top-0 lg:-left-24" />
+          <Glyph type="cross" className="-right-2 bottom-2 lg:-right-20" />
           <Heading>
-            Từ Video Thô Đến Bản Dựng Hoàn Chỉnh.
+            <Words>Từ Video Thô Đến Bản Dựng Hoàn Chỉnh.</Words>
             <br />
-            <span className="text-mute">Ba Bước Đơn Giản.</span>
+            <span className="text-mute">
+              <Words>Ba Bước Đơn Giản.</Words>
+            </span>
           </Heading>
-          <PillButton variant="dark" size="lg" className="self-start md:self-auto" onClick={() => scrollToId('pricing')}>
-            Xem bảng giá
-          </PillButton>
-        </Reveal>
-
-        <div className="mt-[42px] grid gap-3 lg:grid-cols-3">
-          {STEPS.map((s, i) => (
-            <Reveal key={s.number} delay={i * 120}>
-              <article className="flex h-full flex-col rounded-[32px] border border-line bg-card p-8">
-                <h3 className="text-[28px] leading-[1.2] tracking-tightish text-white md:text-[32px]">
-                  <span className="text-mute">{s.number}</span> {s.title}
-                </h3>
-                <div className="mt-[42px]">{mockups[i]}</div>
-                <p className="mt-auto pt-10 text-lg leading-[1.4] tracking-tightish text-mute md:text-xl">{s.caption}</p>
-              </article>
-            </Reveal>
-          ))}
+          <Reveal delay={200} y={24}>
+            <PillButton variant="dark" size="lg" className="mt-8" onClick={() => scrollToId('pricing')}>
+              Xem bảng giá <SlideArrow />
+            </PillButton>
+          </Reveal>
         </div>
+
+        <Stagger className="mt-16 grid gap-3 lg:grid-cols-3" each={0.12}>
+          {STEPS.map((s, i) => (
+            <div key={s.number} data-stagger className="h-full">
+              <TiltCard className="flex h-full flex-col items-center rounded-[32px] border border-line bg-card p-8 text-center">
+                <span className="flex h-14 w-14 items-center justify-center rounded-full border border-accent/30 bg-accent/10 text-[17px] font-bold tabular-nums text-accent">
+                  {s.number}
+                </span>
+                <h3 className="mt-6 text-[28px] leading-[1.2] tracking-tightish text-white md:text-[32px]">{s.title}</h3>
+                <p className="mt-4 max-w-[340px] text-base leading-[1.5] tracking-tightish text-mute md:text-lg">{s.caption}</p>
+                <div className="mt-auto w-full pt-10 text-left">{mockups[i]}</div>
+              </TiltCard>
+            </div>
+          ))}
+        </Stagger>
       </Container>
     </section>
   );
@@ -692,25 +749,59 @@ function RotatingWord({ words }) {
   );
 }
 
+// The marquee loops on its own and speeds up with the scroll velocity, then eases back.
 function Ecosystem() {
+  const ref = useRef(null);
+  const trackRef = useRef(null);
   const list = [...ECOSYSTEM, ...ECOSYSTEM];
+
+  useGSAP(
+    () => {
+      if (!motionOK()) return;
+      const loop = gsap.to(trackRef.current, { xPercent: -50, duration: 40, ease: 'none', repeat: -1 });
+      ScrollTrigger.create({
+        trigger: ref.current,
+        start: 'top bottom',
+        end: 'bottom top',
+        onUpdate: (self) => {
+          loop.timeScale(1 + Math.min(5, Math.abs(self.getVelocity()) / 300));
+          gsap.to(loop, { timeScale: 1, duration: 1.4, ease: 'power2.out', overwrite: true });
+        },
+      });
+      // Hovering the strip slows it so a logo can be read.
+      const el = ref.current;
+      const slow = () => gsap.to(loop, { timeScale: 0.25, duration: 0.6, overwrite: true });
+      const resume = () => gsap.to(loop, { timeScale: 1, duration: 0.6, overwrite: true });
+      el.addEventListener('pointerenter', slow);
+      el.addEventListener('pointerleave', resume);
+      return () => {
+        el.removeEventListener('pointerenter', slow);
+        el.removeEventListener('pointerleave', resume);
+      };
+    },
+    { scope: ref }
+  );
+
   return (
-    <section className="py-[120px]">
+    <section className="border-y border-line py-[100px]">
       <Container>
-        <Reveal>
-          <Heading>
-            Xử lý mạnh mẽ mọi lớp <RotatingWord words={['Video', 'Audio', 'Style', 'Phụ đề']} />.
-            <br />
-            <span className="text-mute">Gói gọn trong một Skill</span>
-          </Heading>
-        </Reveal>
+        <Heading>
+          <Words>Xử lý mạnh mẽ mọi lớp</Words> <RotatingWord words={['Video', 'Audio', 'Style', 'Phụ đề']} />.
+          <br />
+          <span className="text-mute">
+            <Words>Gói gọn trong một Skill</Words>
+          </span>
+        </Heading>
         <Reveal delay={120}>
-          <div className="relative mt-12 overflow-hidden">
-            <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-12 bg-gradient-to-r from-base to-transparent" />
-            <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-12 bg-gradient-to-l from-base to-transparent" />
-            <div className="anim-marquee flex w-max items-center">
+          <div ref={ref} className="relative mt-12 overflow-hidden">
+            <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-16 bg-gradient-to-r from-base to-transparent" />
+            <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-16 bg-gradient-to-l from-base to-transparent" />
+            <div ref={trackRef} className="flex w-max items-center will-change-transform">
               {list.map(({ label, icon: Icon }, i) => (
-                <span key={`${label}-${i}`} className="flex shrink-0 items-center gap-2 px-10 text-[19px] font-bold tracking-tightish text-white">
+                <span
+                  key={`${label}-${i}`}
+                  className="flex shrink-0 items-center gap-2 px-10 text-[19px] font-bold tracking-tightish text-white/70 transition-colors duration-300 hover:text-white"
+                >
                   <Icon className="h-6 w-6" strokeWidth={2.5} />
                   {label}
                 </span>
@@ -727,117 +818,185 @@ function Ecosystem() {
 /* Showcase carousel                                                   */
 /* ------------------------------------------------------------------ */
 
-// Vertical scroll drives the card track sideways while the section is pinned;
-// once the last card is in view the page continues scrolling down.
+// Figma "Portfolio": heading left, staggered cards and pagination dots.
+// While pinned, vertical scroll drives the track sideways; each photo drifts inside its card.
+// Under reduced motion the track is a plain horizontal scroller.
+const CARD_DROP = [0, 56, 24];
+
 function Showcase() {
   const sectionRef = useRef(null);
   const viewportRef = useRef(null);
   const trackRef = useRef(null);
-  const [distance, setDistance] = useState(0);
-  const [offset, setOffset] = useState(0);
+  const barRef = useRef(null);
+  const triggerRef = useRef(null);
+  const [active, setActive] = useState(0);
+  const [edge, setEdge] = useState({ start: true, end: false });
+  const animated = motionOK();
 
-  useEffect(() => {
-    const measure = () => {
-      const viewport = viewportRef.current;
-      const track = trackRef.current;
-      if (!viewport || !track) return;
-      setDistance(Math.max(0, track.scrollWidth - viewport.clientWidth));
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    if (viewportRef.current) ro.observe(viewportRef.current);
-    if (trackRef.current) ro.observe(trackRef.current);
-    return () => ro.disconnect();
-  }, []);
-
-  useEffect(() => {
-    let raf = 0;
-    const update = () => {
-      raf = 0;
-      const section = sectionRef.current;
-      if (!section) return;
-      const scrolled = -section.getBoundingClientRect().top;
-      setOffset(Math.min(distance, Math.max(0, scrolled)));
-    };
-    const onScroll = () => {
-      if (!raf) raf = requestAnimationFrame(update);
-    };
-    update();
-    window.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', onScroll);
-    return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener('scroll', onScroll);
-      window.removeEventListener('resize', onScroll);
-    };
-  }, [distance]);
-
-  const step = (dir) => {
-    const section = sectionRef.current;
+  const distance = () => Math.max(0, (trackRef.current?.scrollWidth || 0) - (viewportRef.current?.clientWidth || 0));
+  const cardStep = () => {
     const card = trackRef.current?.firstElementChild;
-    if (!section || !card) return;
-    const cardStep = card.getBoundingClientRect().width + 12;
-    const target = Math.min(distance, Math.max(0, offset + dir * cardStep));
-    const sectionTop = section.getBoundingClientRect().top + window.scrollY;
-    window.scrollTo({ top: sectionTop + target, behavior: 'smooth' });
+    return card ? card.getBoundingClientRect().width + 12 : 1;
   };
 
-  const progress = distance ? offset / distance : 0;
+  useGSAP(
+    () => {
+      if (!animated) return;
+      const tween = gsap.to(trackRef.current, {
+        x: () => -distance(),
+        ease: 'none',
+        scrollTrigger: {
+          trigger: sectionRef.current,
+          start: 'top top',
+          end: () => `+=${distance()}`,
+          pin: true,
+          scrub: 0.8,
+          invalidateOnRefresh: true,
+          onUpdate: (self) => {
+            if (barRef.current) barRef.current.style.transform = `scaleX(${self.progress})`;
+            const idx = Math.min(SHOWCASE.length - 1, Math.round((self.progress * distance()) / cardStep()));
+            setActive((v) => (v === idx ? v : idx));
+            const start = self.progress < 0.01;
+            const end = self.progress > 0.99;
+            setEdge((v) => (v.start === start && v.end === end ? v : { start, end }));
+          },
+        },
+      });
+      triggerRef.current = tween.scrollTrigger;
+
+      gsap.utils.toArray('[data-card-media]').forEach((m) => {
+        gsap.fromTo(
+          m,
+          { xPercent: -6 },
+          {
+            xPercent: 6,
+            ease: 'none',
+            scrollTrigger: { trigger: m.parentElement, containerAnimation: tween, start: 'left right', end: 'right left', scrub: true },
+          }
+        );
+      });
+
+      gsap.from('[data-show-head] > div', {
+        y: 40,
+        autoAlpha: 0,
+        duration: 1.2,
+        ease: 'silk',
+        stagger: 0.08,
+        scrollTrigger: { trigger: sectionRef.current, start: 'top 80%', once: true },
+      });
+      gsap.from('[data-show-card]', {
+        x: 120,
+        autoAlpha: 0,
+        duration: 1.4,
+        ease: 'silk',
+        stagger: 0.08,
+        scrollTrigger: { trigger: sectionRef.current, start: 'top 70%', once: true },
+      });
+    },
+    { scope: sectionRef }
+  );
+
+  // Arrows and dots: scroll the page to where the pinned track shows the wanted card.
+  const goTo = (index) => {
+    const i = Math.max(0, Math.min(SHOWCASE.length - 1, index));
+    const target = Math.min(distance(), i * cardStep());
+    const st = triggerRef.current;
+    if (st) {
+      const dist = distance() || 1;
+      scrollToY(st.start + (st.end - st.start) * (target / dist));
+    } else {
+      viewportRef.current?.scrollTo({ left: target, behavior: 'smooth' });
+    }
+    if (!st) setActive(i);
+  };
+
+  const onNativeScroll = () => {
+    if (animated) return;
+    const v = viewportRef.current;
+    const max = v.scrollWidth - v.clientWidth;
+    setActive(Math.min(SHOWCASE.length - 1, Math.round(v.scrollLeft / cardStep())));
+    setEdge({ start: v.scrollLeft < 4, end: v.scrollLeft > max - 4 });
+    if (barRef.current) barRef.current.style.transform = `scaleX(${max ? v.scrollLeft / max : 0})`;
+  };
 
   return (
-    <section id="showcase" ref={sectionRef} className="relative scroll-mt-0" style={{ height: `calc(100vh + ${distance}px)` }}>
-      <div className="sticky top-0 flex h-screen flex-col justify-center overflow-hidden pt-[81px]">
+    <section id="showcase" ref={sectionRef} className="relative overflow-hidden">
+      <div className="flex min-h-screen flex-col justify-center pb-10 pt-[100px]">
         <Container>
-          <Reveal className="flex items-center justify-between gap-6">
-            <Heading>Một Skill. Mọi Phong Cách Dựng.</Heading>
-            <div className="flex shrink-0 gap-2">
+          <div data-show-head className="relative flex items-end justify-between gap-6">
+            <Heading>
+              <Words>Một Skill. Mọi Phong Cách Dựng.</Words>
+            </Heading>
+            <div className="flex shrink-0 items-center gap-2">
+              <Glyph type="rings" className="-top-14 right-0 lg:-left-16 lg:right-auto lg:top-1" />
               {[
-                { dir: -1, icon: ChevronLeft, label: 'Mẫu trước', disabled: offset <= 0 },
-                { dir: 1, icon: ChevronRight, label: 'Mẫu tiếp theo', disabled: offset >= distance },
+                { dir: -1, icon: ChevronLeft, label: 'Mẫu trước', disabled: edge.start },
+                { dir: 1, icon: ChevronRight, label: 'Mẫu tiếp theo', disabled: edge.end },
               ].map(({ dir, icon: Icon, label, disabled }) => (
                 <button
                   key={label}
                   type="button"
-                  onClick={() => step(dir)}
+                  onClick={() => goTo(active + dir)}
                   aria-label={label}
                   disabled={disabled}
-                  className="flex h-[42px] w-[42px] items-center justify-center rounded-full border border-line bg-black/20 text-white transition-[border-color,background-color,opacity] hover:border-line2 hover:bg-white/5 disabled:cursor-default disabled:opacity-35 disabled:hover:border-line disabled:hover:bg-black/20"
+                  className="flex h-[42px] w-[42px] items-center justify-center rounded-full border border-line bg-black/20 text-white transition-[border-color,background-color,opacity,transform] duration-300 hover:border-line2 hover:bg-white/5 active:scale-95 disabled:cursor-default disabled:opacity-35 disabled:hover:border-line disabled:hover:bg-black/20"
                 >
                   <Icon className="h-[18px] w-[18px]" />
                 </button>
               ))}
             </div>
-          </Reveal>
+          </div>
 
-          <Reveal delay={120}>
-            <div ref={viewportRef} className="mt-[42px] [--cw:300px] sm:[--cw:380px] lg:[--cw:445px]">
-              <div
-                ref={trackRef}
-                className="flex w-max gap-3 will-change-transform"
-                style={{ transform: `translate3d(${-offset}px, 0, 0)` }}
-              >
-                {SHOWCASE.map((item) => (
+          <div
+            ref={viewportRef}
+            onScroll={onNativeScroll}
+            className={`mt-[42px] [--cw:290px] sm:[--cw:360px] lg:[--cw:420px] ${animated ? '' : 'no-scrollbar snap-x overflow-x-auto'}`}
+          >
+            <div ref={trackRef} className="flex w-max items-start gap-3 pb-14 will-change-transform">
+              {SHOWCASE.map((item, i) => (
+                <div key={item.mode} data-show-card className="shrink-0 snap-start" style={{ marginTop: CARD_DROP[i % 3] }}>
                   <PhotoCard
-                    key={item.mode}
                     image={item.image}
-                    overlay="bg-gradient-to-b from-black/30 via-transparent to-black/75"
-                    className="h-[min(420px,52vh)] w-[var(--cw)] shrink-0 sm:h-[min(480px,56vh)] lg:h-[min(530px,58vh)]"
+                    parallax={false}
+                    overlay="bg-gradient-to-b from-black/30 via-transparent to-black/80"
+                    className="h-[min(400px,48vh)] w-[var(--cw)] transition-[border-color] duration-500 hover:border-line2 sm:h-[min(440px,50vh)] lg:h-[min(480px,52vh)]"
                   >
                     <div className="flex h-full flex-col justify-between p-8">
                       <p className="text-xl font-medium tracking-tightish text-white">{item.mode}</p>
-                      <div>
-                        <p className="text-sm font-medium tracking-tightish text-white">LỆNH DNA</p>
+                      <div className="transition-transform duration-700 ease-silk group-hover:-translate-y-1">
+                        <p className="text-sm font-medium tracking-tightish text-accent">LỆNH DNA</p>
                         <h4 className="mt-2 text-xl font-medium leading-[1.2] tracking-tightish text-white lg:text-2xl">{item.prompt}</h4>
                       </div>
                     </div>
                   </PhotoCard>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
-          </Reveal>
+          </div>
 
-          <div className="mt-8 h-px w-full overflow-hidden bg-line" aria-hidden="true">
-            <div className="h-full origin-left bg-white/60" style={{ transform: `scaleX(${progress})` }} />
+          <div className="relative flex items-center justify-between gap-6">
+            <Glyph type="zigzag" className="left-0 top-0" />
+            <div className="mx-auto flex items-center gap-2" role="group" aria-label="Chọn mẫu">
+              {SHOWCASE.map((item, i) => (
+                <button
+                  key={item.mode}
+                  type="button"
+                  onClick={() => goTo(i)}
+                  aria-label={item.mode}
+                  aria-current={active === i}
+                  className="group flex h-6 items-center"
+                >
+                  <span
+                    className={`block h-1.5 rounded-full transition-[width,background-color] duration-500 ease-silk ${
+                      active === i ? 'w-6 bg-accent' : 'w-1.5 bg-line2 group-hover:bg-mute'
+                    }`}
+                  />
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="mt-4 h-px w-full overflow-hidden bg-line" aria-hidden="true">
+            <div ref={barRef} className="h-full origin-left bg-white/60" style={{ transform: 'scaleX(0)' }} />
           </div>
         </Container>
       </div>
@@ -853,7 +1012,9 @@ function MetricCard({ image, value, label, className = '', position }) {
   return (
     <PhotoCard image={image} position={position} className={className} overlay="bg-black/40">
       <div className="flex h-full flex-col items-center justify-center p-8 text-center">
-        <p className="text-[52px] font-medium leading-[1.2] text-white md:text-[60px]">{value}</p>
+        <p className="text-[52px] font-medium leading-[1.2] text-white md:text-[60px]">
+          <CountUp value={value} />
+        </p>
         <h4 className="mt-1 text-xl font-medium leading-[1.2] tracking-tightish text-white md:text-2xl">{label}</h4>
       </div>
     </PhotoCard>
@@ -871,35 +1032,55 @@ function CenterCard({ image, title, desc, className = '', position }) {
   );
 }
 
+// Figma "Why choose" header split: heading left, supporting copy and action right.
+function SplitHeader({ heading, children }) {
+  return (
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] lg:items-end lg:gap-16">
+      {heading}
+      <Reveal delay={150} y={24} className="lg:justify-self-end">
+        {children}
+      </Reveal>
+    </div>
+  );
+}
+
 function Features({ onCheckout }) {
   return (
     <section id="features" className="scroll-mt-10 py-[120px]">
       <Container>
-        <Reveal className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-          <div>
+        <SplitHeader
+          heading={
             <Heading>
-              Mọi thứ bạn cần để nhân bản
+              <Words>Mọi thứ bạn cần để nhân bản</Words>
               <br />
-              tốc độ Edit <span className="text-mute">gấp 10 lần</span>
+              <Words>tốc độ Edit</Words>{' '}
+              <span className="text-mute">
+                <Words>gấp 10 lần</Words>
+              </span>
             </Heading>
-            <p className="mt-5 text-lg leading-[1.4] text-mute">Trích xuất, tự động dựng, kiểm duyệt và xuất bản — trong một luồng duy nhất.</p>
+          }
+        >
+          <div className="max-w-[400px]">
+            <p className="text-lg leading-[1.5] text-mute">Trích xuất, tự động dựng, kiểm duyệt và xuất bản — trong một luồng duy nhất.</p>
+            <Magnetic className="mt-6 inline-flex">
+              <PillButton onClick={onCheckout}>
+                Nhận Slot Beta <SlideArrow />
+              </PillButton>
+            </Magnetic>
           </div>
-          <PillButton className="self-start md:self-auto" onClick={onCheckout}>
-            Nhận Slot Beta
-          </PillButton>
-        </Reveal>
+        </SplitHeader>
 
-        <div className="mt-[42px] grid gap-3 lg:grid-cols-[735fr_613fr]">
-          <div className="flex flex-col gap-3">
+        <div className="mt-[56px] grid gap-3 lg:grid-cols-[735fr_613fr]">
+          <Stagger className="flex flex-col gap-3">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Reveal>
+              <div data-stagger>
                 <MetricCard image="fox" value="0.1s" label="Kiểm duyệt QA tự động" className="h-[250px]" />
-              </Reveal>
-              <Reveal delay={80}>
+              </div>
+              <div data-stagger>
                 <MetricCard image="eye" value="4K" label="60FPS · Giữ chất lượng gốc" className="h-[250px]" />
-              </Reveal>
+              </div>
             </div>
-            <Reveal delay={60}>
+            <div data-stagger>
               <PhotoCard image="tennis-ball" className="h-[355px]" overlay="bg-gradient-to-b from-black/35 via-black/10 to-black/55">
                 <div className="flex h-full flex-col justify-between p-8">
                   <p className="text-xl font-medium tracking-tightish text-white">Sao chép mọi Style</p>
@@ -908,8 +1089,8 @@ function Features({ onCheckout }) {
                   </h4>
                 </div>
               </PhotoCard>
-            </Reveal>
-            <Reveal delay={60}>
+            </div>
+            <div data-stagger>
               <CenterCard
                 image="flowers"
                 title="Mua 1 lần, dùng mãi mãi"
@@ -917,39 +1098,39 @@ function Features({ onCheckout }) {
                 className="h-[260px] lg:h-[225px]"
                 position="center 70%"
               />
-            </Reveal>
-          </div>
+            </div>
+          </Stagger>
 
-          <div className="flex flex-col gap-3">
-            <Reveal delay={80}>
+          <Stagger className="flex flex-col gap-3">
+            <div data-stagger>
               <CenterCard
                 image="tennis-court"
                 title="Liquid Choreography"
                 desc="Lệch pha 2-4 frame (Micro-Staggering) giúp chuyển động mượt tự nhiên, không bị “mùi AI”."
                 className="h-[300px]"
               />
-            </Reveal>
-            <Reveal delay={80}>
+            </div>
+            <div data-stagger>
               <CenterCard
                 image="desert"
                 title="Đa nền tảng dựng"
                 desc="Chuyển đổi linh hoạt giữa CapCut, Premiere Pro, Remotion và FFmpeg trong một luồng duy nhất."
                 className="h-[280px]"
               />
-            </Reveal>
+            </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Reveal delay={80}>
+              <div data-stagger>
                 <MetricCard image="flowers-purple" value="90%" label="Thời gian tiết kiệm" className="h-[250px]" />
-              </Reveal>
-              <Reveal delay={140}>
+              </div>
+              <div data-stagger>
                 <PhotoCard image="court-line" className="h-[250px]" overlay="bg-black/10">
                   <div className="flex h-full items-center justify-center">
                     <Logo size={62} />
                   </div>
                 </PhotoCard>
-              </Reveal>
+              </div>
             </div>
-          </div>
+          </Stagger>
         </div>
       </Container>
     </section>
@@ -1076,44 +1257,69 @@ function WorkspaceWindow() {
   );
 }
 
+// Figma "Why choose us": split header, then one wide media frame.
+// The window rises and settles to full size as the frame scrolls into view.
 function Workspace() {
-  return (
-    <section className="py-[120px]">
-      <Container>
-        <Reveal>
-          <Heading>
-            Một trung tâm điều khiển.
-            <br />
-            <span className="text-mute">Vận hành bởi hệ thống Multi-Agent.</span>
-          </Heading>
-        </Reveal>
+  const frameRef = useRef(null);
 
-        <Reveal delay={120}>
-          <div className="relative mt-[42px] flex justify-center overflow-hidden rounded-[32px] border border-line bg-card px-3 py-10 sm:px-10 lg:h-[665px] lg:items-center lg:py-0">
-            <img
-              src={media('reef-wide')}
-              alt=""
-              loading="lazy"
-              className="absolute inset-0 h-full w-full scale-110 object-cover opacity-50 blur-[10px] brightness-[.45] saturate-[.8]"
-            />
+  useGSAP(
+    () => {
+      if (!motionOK()) return;
+      gsap.fromTo(
+        '[data-ws-window]',
+        { scale: 0.88, yPercent: 10 },
+        {
+          scale: 1,
+          yPercent: 0,
+          ease: 'none',
+          scrollTrigger: { trigger: frameRef.current, start: 'top bottom', end: 'center center', scrub: 1 },
+        }
+      );
+    },
+    { scope: frameRef }
+  );
+
+  return (
+    <section id="workspace" className="relative py-[120px]">
+      <Container>
+        <SplitHeader
+          heading={
+            <Heading>
+              <Words>Một trung tâm điều khiển.</Words>
+              <br />
+              <span className="text-mute">
+                <Words>Vận hành bởi hệ thống Multi-Agent.</Words>
+              </span>
+            </Heading>
+          }
+        >
+          <ul className="grid max-w-[460px] gap-5">
+            {WORKSPACE_FEATURES.map(({ icon: Icon, title, desc }) => (
+              <li key={title} className="flex gap-4">
+                <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-accent/25 bg-accent/10 text-accent">
+                  <Icon className="h-[18px] w-[18px]" strokeWidth={1.75} />
+                </span>
+                <div>
+                  <p className="text-lg font-medium tracking-tightish text-white">{title}</p>
+                  <p className="mt-1 text-base leading-[1.5] text-mute">{desc}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </SplitHeader>
+
+        <Reveal delay={100}>
+          <div
+            ref={frameRef}
+            className="relative mt-[56px] flex justify-center overflow-hidden rounded-[32px] border border-line bg-card px-3 py-10 sm:px-10 lg:h-[665px] lg:items-center lg:py-0"
+          >
+            <ParallaxMedia src={media('reef-wide')} amount={10} imgClassName="scale-110 opacity-50 blur-[10px] brightness-[.45] saturate-[.8]" />
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_20%,rgba(10,10,10,0.75)_80%)]" />
-            <div className="relative w-full max-w-[700px]">
+            <div data-ws-window className="relative w-full max-w-[700px] will-change-transform">
               <WorkspaceWindow />
             </div>
           </div>
         </Reveal>
-
-        <div className="mt-[42px] grid gap-10 md:grid-cols-3">
-          {WORKSPACE_FEATURES.map(({ icon: Icon, title, desc }, i) => (
-            <Reveal key={title} delay={i * 100}>
-              <p className="flex items-center gap-2 text-xl font-medium tracking-tightish text-white">
-                <Icon className="h-5 w-5" strokeWidth={1.75} />
-                {title}
-              </p>
-              <p className="mt-3 max-w-[320px] text-lg leading-[1.4] text-mute">{desc}</p>
-            </Reveal>
-          ))}
-        </div>
       </Container>
     </section>
   );
@@ -1140,7 +1346,7 @@ function FeatureList({ items, muted = false }) {
 
 function LockedCard({ title, price, features, blur, opacity, lockTitle, lockSub }) {
   return (
-    <div className="relative h-full overflow-hidden rounded-[32px] border border-line bg-card">
+    <div onPointerMove={trackGlow} className="glow-card relative h-full overflow-hidden rounded-[32px] border border-line bg-card">
       <div aria-hidden="true" className={`pointer-events-none flex h-full select-none flex-col p-8 ${opacity}`} style={{ filter: `blur(${blur})` }}>
         <p className="text-xl font-medium tracking-tightish text-white">{title}</p>
         <p className="mt-8 text-[44px] font-medium leading-[1.2] tracking-tightish text-white">{formatVnd(price)}</p>
@@ -1170,33 +1376,60 @@ function Pricing({ onCheckout }) {
   const slotsLeft = known ? Math.max(0, BETA_SLOTS_TOTAL - slotsTaken) : null;
   const soldOut = slotsLeft === 0;
   const savePct = Math.round((1 - BETA_PRICE / ULTIMATE_PRICE) * 100);
+  const ref = useRef(null);
+
+  useGSAP(
+    () => {
+      if (!motionOK()) return;
+      gsap.from('[data-slot-bar]', {
+        scaleX: 0,
+        duration: 1.8,
+        ease: 'silk',
+        scrollTrigger: { trigger: '[data-slot-bar]', start: 'top 90%', once: true },
+      });
+    },
+    { scope: ref }
+  );
 
   return (
-    <section id="pricing" className="scroll-mt-10 py-[120px]">
+    <section id="pricing" ref={ref} className="scroll-mt-10 py-[120px]">
       <Container>
-        <Reveal className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-          <div>
+        <SplitHeader
+          heading={
             <Heading>
-              Sở hữu trọn đời.
+              <Words>Sở hữu trọn đời.</Words>
               <br />
-              <span className="text-mute">Thanh toán một lần duy nhất.</span>
+              <span className="text-mute">
+                <Words>Thanh toán một lần duy nhất.</Words>
+              </span>
             </Heading>
-            <p className="mt-5 text-lg leading-[1.4] text-mute">Không phí thuê bao. Không giới hạn số video. Nhận mọi bản cập nhật.</p>
-          </div>
-          <span className="inline-flex items-center gap-2 self-start rounded-full border border-line bg-base px-6 py-[14px] text-base font-medium tracking-tightish text-white md:self-auto">
+          }
+        >
+          <div className="flex max-w-[420px] flex-col items-start gap-5 lg:items-end lg:text-right">
+          <p className="text-lg leading-[1.4] text-mute">Không phí thuê bao. Không giới hạn số video. Nhận mọi bản cập nhật.</p>
+          <span className="inline-flex items-center gap-2 rounded-full border border-line bg-base px-6 py-[14px] text-base font-medium tracking-tightish text-white">
             <span className="relative flex h-2 w-2">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-70" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-accent" />
             </span>
-            {soldOut ? 'Đã hết slot Beta' : known ? `Còn ${slotsLeft}/${BETA_SLOTS_TOTAL} slot Beta` : `Giới hạn ${BETA_SLOTS_TOTAL} slot Beta`}
+            {soldOut ? (
+              'Đã hết slot Beta'
+            ) : known ? (
+              <span>
+                Còn <CountUp value={slotsLeft} />/{BETA_SLOTS_TOTAL} slot Beta
+              </span>
+            ) : (
+              `Giới hạn ${BETA_SLOTS_TOTAL} slot Beta`
+            )}
           </span>
-        </Reveal>
+          </div>
+        </SplitHeader>
 
-        <div className="mt-[42px] grid gap-3 lg:grid-cols-3">
-          <Reveal>
-            <div className="relative flex h-full flex-col overflow-hidden rounded-[32px] border border-line2 bg-card">
+        <Stagger className="mt-[56px] grid gap-3 lg:grid-cols-3" each={0.12}>
+          <div data-stagger>
+            <TiltCard as="div" max={2.5} className="relative flex h-full flex-col overflow-hidden rounded-[32px] border border-line2 bg-card">
               <div className="relative h-[150px] overflow-hidden">
-                <img src={media('hero-alt')} alt="" className="absolute inset-0 h-full w-full object-cover brightness-[.75]" />
+                <ParallaxMedia src={media('hero-alt')} amount={10} imgClassName="brightness-[.75]" />
                 <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/30 to-card" />
                 <span className="absolute left-8 top-8 inline-flex max-w-[calc(100%-4rem)] items-center rounded-full bg-base/80 px-4 py-1.5 text-xs font-medium tracking-tightish text-white backdrop-blur-md">
                   🔥 ĐANG MỞ BÁN — GIỚI HẠN SLOT ĐẦU TIÊN
@@ -1212,7 +1445,7 @@ function Pricing({ onCheckout }) {
                 <p className="mt-1 text-base text-mute">Thanh toán 1 lần duy nhất</p>
 
                 <div className="mt-6 h-1.5 overflow-hidden rounded-full bg-chip">
-                  <div className="h-full rounded-full bg-white" style={{ width: `${(Math.min(slotsTaken ?? 0, BETA_SLOTS_TOTAL) / BETA_SLOTS_TOTAL) * 100}%` }} />
+                  <div data-slot-bar className="h-full origin-left rounded-full bg-white" style={{ width: `${(Math.min(slotsTaken ?? 0, BETA_SLOTS_TOTAL) / BETA_SLOTS_TOTAL) * 100}%` }} />
                 </div>
                 <p className="mt-2 text-sm text-mute">
                   {known ? `Đã nhận ${Math.min(slotsTaken, BETA_SLOTS_TOTAL)}/${BETA_SLOTS_TOTAL} slot` : `${BETA_SLOTS_TOTAL} slot đầu tiên`} · Giá tăng lên{' '}
@@ -1235,10 +1468,10 @@ function Pricing({ onCheckout }) {
                   <FeatureList items={BETA_FEATURES} />
                 </div>
               </div>
-            </div>
-          </Reveal>
+            </TiltCard>
+          </div>
 
-          <Reveal delay={100}>
+          <div data-stagger>
             <LockedCard
               title="Phiên Bản Chính Thức (Official Release)"
               price={OFFICIAL_PRICE}
@@ -1248,9 +1481,9 @@ function Pricing({ onCheckout }) {
               lockTitle="Mở khóa sau khi kết thúc đợt Beta"
               lockSub="Giá sẽ tăng lên 479.000đ ngay khi hết slot thử nghiệm 349.000đ"
             />
-          </Reveal>
+          </div>
 
-          <Reveal delay={200}>
+          <div data-stagger>
             <LockedCard
               title="Phiên Bản Cao Cấp Nhất (Ultimate Studio)"
               price={ULTIMATE_PRICE}
@@ -1260,8 +1493,8 @@ function Pricing({ onCheckout }) {
               lockTitle="Sắp ra mắt (Coming Soon)"
               lockSub="Dành cho Agency & Studio quy mô lớn"
             />
-          </Reveal>
-        </div>
+          </div>
+        </Stagger>
       </Container>
     </section>
   );
@@ -1384,7 +1617,7 @@ function CheckoutModal({ open, onClose, me, reloadMe }) {
     <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-labelledby="checkout-title">
       <button type="button" aria-label="Đóng" onClick={onClose} className="anim-fade-up absolute inset-0 bg-black/75 backdrop-blur-md" />
 
-      <div className="anim-fade-up relative max-h-[92vh] w-full max-w-[860px] overflow-y-auto rounded-t-[32px] border border-line bg-card sm:rounded-[32px]">
+      <div data-lenis-prevent className="anim-fade-up relative max-h-[92vh] w-full max-w-[860px] overflow-y-auto rounded-t-[32px] border border-line bg-card sm:rounded-[32px]">
         <div className="flex items-start justify-between gap-4 border-b border-line px-6 py-5 sm:px-8">
           <div>
             <p id="checkout-title" className="text-xl font-medium tracking-tightish text-white">
@@ -1658,36 +1891,66 @@ function CheckoutModal({ open, onClose, me, reloadMe }) {
 /* Footer CTA & footer                                                 */
 /* ------------------------------------------------------------------ */
 
+// Figma "Contact us": heading left, action right. The photo fan opens from a stack as it scrolls in.
 function FooterCta({ onCheckout }) {
+  const fanRef = useRef(null);
+
+  useGSAP(
+    () => {
+      if (!motionOK()) return;
+      gsap.utils.toArray('[data-fan]').forEach((card) => {
+        const toCentre = 100 - (card.offsetLeft + card.offsetWidth / 2);
+        gsap.from(card, {
+          x: toCentre,
+          y: 30,
+          rotation: 0,
+          ease: 'none',
+          scrollTrigger: { trigger: fanRef.current, start: 'top 95%', end: 'top 45%', scrub: 1 },
+        });
+      });
+    },
+    { scope: fanRef }
+  );
+
   return (
-    <section className="py-[120px]">
-      <Container className="flex flex-col items-center text-center">
-        <Reveal>
-          <div className="relative h-[250px] w-[200px] scale-[0.72] sm:scale-100">
+    <section className="relative overflow-hidden border-t border-line py-[120px]">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_80%_50%,rgba(4,184,224,0.08),transparent_55%)]" aria-hidden="true" />
+      <Container className="relative grid items-center gap-16 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+        <div className="relative">
+          <Glyph type="plus" className="-top-12 right-0 lg:right-10" />
+          <Heading className="max-w-[640px] lg:text-[56px]">
+            <Words>Bản dựng tiếp theo của bạn bắt đầu từ đây</Words>
+          </Heading>
+          <Glyph type="rings" className="-bottom-20 left-2" />
+        </div>
+
+        <div className="flex flex-col items-center gap-10 lg:items-end">
+          <div ref={fanRef} className="relative h-[250px] w-[200px] scale-[0.72] sm:scale-100 lg:mr-[230px]">
             {FAN_CARDS.map((c) => (
-              <img
-                key={c.image}
-                src={media(c.image)}
-                alt=""
-                loading="lazy"
-                className={`absolute rounded-[32px] border border-line object-cover shadow-[0_20px_60px_-10px_rgba(0,0,0,0.8)] transition-transform duration-500 hover:-translate-y-2 ${c.className}`}
-              />
+              <div key={c.image} data-fan className={`absolute ${c.className}`}>
+                <img
+                  src={media(c.image)}
+                  alt=""
+                  loading="lazy"
+                  className="h-full w-full rounded-[32px] border border-line object-cover shadow-[0_20px_60px_-10px_rgba(0,0,0,0.8)] transition-transform duration-500 ease-silk hover:-translate-y-2"
+                />
+              </div>
             ))}
           </div>
-        </Reveal>
-        <Reveal delay={100}>
-          <Heading className="mt-10">Bản dựng tiếp theo của bạn bắt đầu từ đây</Heading>
-        </Reveal>
-        <Reveal delay={180}>
-          <PillButton className="mt-8" onClick={onCheckout}>
-            Nhận Slot Beta — {formatVnd(BETA_PRICE)}
-          </PillButton>
-        </Reveal>
+          <Reveal delay={150} y={24}>
+            <Magnetic>
+              <PillButton size="lg" onClick={onCheckout}>
+                Nhận Slot Beta — {formatVnd(BETA_PRICE)} <SlideArrow />
+              </PillButton>
+            </Magnetic>
+          </Reveal>
+        </div>
       </Container>
     </section>
   );
 }
 
+// Figma footer: one row — brand, links, legal — on a quiet ground.
 function Footer() {
   return (
     <footer className="relative overflow-hidden border-t border-line">
@@ -1695,11 +1958,11 @@ function Footer() {
         src={media('reef-wide')}
         alt=""
         loading="lazy"
-        className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-30 brightness-[.5] saturate-[.8] [mask-image:radial-gradient(ellipse_at_center,#000_10%,transparent_75%)]"
+        className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-20 brightness-[.5] saturate-[.8] [mask-image:radial-gradient(ellipse_at_center,#000_10%,transparent_75%)]"
       />
-      <Container className="relative pb-10 pt-[120px]">
-        <div className="flex flex-col gap-14 lg:flex-row lg:justify-between">
-          <div>
+      <Container className="relative pb-10 pt-20">
+        <Stagger className="grid gap-12 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,1fr)] lg:items-start">
+          <div data-stagger>
             <div className="flex items-center gap-4">
               <Logo size={32} />
               <p className="max-w-[170px] text-sm font-medium leading-[1.2] tracking-tightish text-mute">Skill AI tự động edit video & sao chép Style DNA.</p>
@@ -1711,42 +1974,47 @@ function Footer() {
                 { icon: Bot, label: 'Discord' },
                 { icon: MonitorPlay, label: 'YouTube' },
               ].map(({ icon: Icon, label }) => (
-                <span key={label} title={label} className="flex h-[42px] w-[42px] items-center justify-center rounded-full border border-line bg-card text-white">
+                <span
+                  key={label}
+                  title={label}
+                  className="flex h-[42px] w-[42px] items-center justify-center rounded-full border border-line bg-card text-white transition-[border-color,transform] duration-500 ease-silk hover:-translate-y-0.5 hover:border-line2"
+                >
                   <Icon className="h-4 w-4" />
                 </span>
               ))}
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-10 lg:w-[620px] lg:gap-0">
-            <div>
-              <p className="text-base tracking-[0.01em] text-mute">Điều hướng</p>
-              <ul className="mt-4 space-y-[13px]">
-                {NAV_LINKS.map((l) => (
-                  <li key={l.href}>
-                    <a href={l.href} className="text-lg text-white transition-opacity hover:opacity-60">
-                      {l.label}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <p className="text-base tracking-[0.01em] text-mute">Định dạng</p>
-              <ul className="mt-4 space-y-[13px] text-lg text-white">
-                <li>CapCut JSON</li>
-                <li>Premiere XML</li>
-                <li>Remotion / FFmpeg</li>
-                <li>VietSub SRT</li>
-              </ul>
-            </div>
+          <div data-stagger>
+            <p className="text-base tracking-[0.01em] text-mute">Điều hướng</p>
+            <ul className="mt-4 space-y-[13px]">
+              {NAV_LINKS.map((l) => (
+                <li key={l.href}>
+                  <a href={l.href} className="group inline-flex items-center gap-1.5 text-lg text-white">
+                    <span className="link-draw">{l.label}</span>
+                    <SlideArrow className="h-3.5 w-3.5 text-mute" />
+                  </a>
+                </li>
+              ))}
+            </ul>
           </div>
-        </div>
 
-        <div className="mt-[120px] flex flex-col gap-3 text-base font-medium tracking-tightish text-mute sm:flex-row sm:justify-between">
+          <div data-stagger>
+            <p className="text-base tracking-[0.01em] text-mute">Định dạng</p>
+            <ul className="mt-4 space-y-[13px] text-lg text-white">
+              <li>CapCut JSON</li>
+              <li>Premiere XML</li>
+              <li>Remotion / FFmpeg</li>
+              <li>VietSub SRT</li>
+            </ul>
+          </div>
+        </Stagger>
+
+        <div className="mt-20 flex flex-col gap-3 border-t border-line pt-8 text-base font-medium tracking-tightish text-mute sm:flex-row sm:justify-between">
           <span>© {new Date().getFullYear()} AI EDITOR.</span>
-          <a href="#top" className="text-white underline decoration-dashed underline-offset-4 transition-opacity hover:opacity-60">
-            Về đầu trang
+          <a href="#top" className="group inline-flex items-center gap-1.5 text-white">
+            <span className="link-draw">Về đầu trang</span>
+            <SlideArrow className="h-3.5 w-3.5 -rotate-45" />
           </a>
         </div>
       </Container>
@@ -1765,8 +2033,23 @@ export default function App() {
   const openCheckout = useCallback(() => setCheckoutOpen(true), []);
   const closeCheckout = useCallback(() => setCheckoutOpen(false), []);
 
+  useSmoothScroll();
+  useGlyphs();
+
+  // Every section has registered its triggers by now: order them by page position and measure once.
+  useEffect(() => {
+    ScrollTrigger.sort();
+    ScrollTrigger.refresh();
+    document.fonts?.ready.then(() => ScrollTrigger.refresh());
+  }, []);
+
   useEffect(() => {
     if (checkoutOpen && window.location.search) window.history.replaceState(null, '', window.location.pathname);
+  }, [checkoutOpen]);
+
+  // The page behind the checkout dialog stops scrolling while it is open.
+  useEffect(() => {
+    scrollLock(checkoutOpen);
   }, [checkoutOpen]);
 
   return (
@@ -1775,11 +2058,11 @@ export default function App() {
       <Navbar onCheckout={openCheckout} me={me} />
       <main>
         <Hero />
+        <Workspace />
         <Workflow />
         <Ecosystem />
-        <Showcase />
         <Features onCheckout={openCheckout} />
-        <Workspace />
+        <Showcase />
         <Pricing onCheckout={openCheckout} />
         <FooterCta onCheckout={openCheckout} />
       </main>

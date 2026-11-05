@@ -2,8 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Lenis drives scrolling on the landing page; native smooth scroll would fight it. */
 html {
-  scroll-behavior: smooth;
   background: #0a0a0a;
 }
 
@@ -20,7 +20,45 @@ body {
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { scrollbar-width: none; }
 
+/* Card with a cursor-following glow and a brightening border (TiltCard sets --mx/--my). */
+.glow-card {
+  position: relative;
+  isolation: isolate;
+  transition: border-color 0.5s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.glow-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 50%), rgba(4, 184, 224, 0.14), transparent 45%);
+  transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.glow-card:hover {
+  border-color: #333333;
+  box-shadow: 0 30px 80px -40px rgba(4, 184, 224, 0.35);
+}
+.glow-card:hover::before { opacity: 1; }
+
+/* Underline that draws in from the left and leaves to the right. */
+.link-draw { position: relative; }
+.link-draw::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -4px;
+  height: 1px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: right;
+  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.link-draw:hover::after { transform: scaleX(1); transform-origin: left; }
+
 @media (prefers-reduced-motion: reduce) {
-  html { scroll-behavior: auto; }
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }

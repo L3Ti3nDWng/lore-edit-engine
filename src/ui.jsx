@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Check, Copy } from 'lucide-react';
 
 // Shared design primitives for the landing page, /account and /admin.
@@ -26,17 +26,52 @@ export function GlobalStyles() {
   );
 }
 
-// Framer-style pill: label rolls up on hover.
-export function PillButton({ children, variant = 'light', size = 'md', className = '', ...rest }) {
+// Fill circle that grows from where the pointer enters and shrinks toward where it leaves.
+function moveFill(e, fill, on) {
+  if (!fill || e.currentTarget.disabled) return;
+  const r = e.currentTarget.getBoundingClientRect();
+  const size = Math.max(r.width, r.height) * 2.3;
+  const x = e.clientX - r.left - size / 2;
+  const y = e.clientY - r.top - size / 2;
+  fill.style.width = `${size}px`;
+  fill.style.height = `${size}px`;
+  if (on) {
+    // Jump to the entry point at zero scale, then grow.
+    fill.style.transition = 'none';
+    fill.style.transform = `translate(${x}px, ${y}px) scale(0)`;
+    void fill.offsetWidth;
+    fill.style.transition = '';
+  }
+  fill.style.transform = `translate(${x}px, ${y}px) scale(${on ? 1 : 0})`;
+}
+
+// Framer-style pill: label rolls up on hover over a directional fill; presses on click.
+export function PillButton({ children, variant = 'light', size = 'md', className = '', onPointerEnter, onPointerLeave, ...rest }) {
+  const fillRef = useRef(null);
   const styles =
-    variant === 'light' ? 'bg-white text-base' : 'border border-line bg-base text-white hover:border-line2';
+    variant === 'light' ? 'bg-white text-base' : 'border border-line bg-base text-white hover:border-white hover:text-base';
+  const fill = variant === 'light' ? 'bg-accent' : 'bg-white';
   const pad = size === 'sm' ? 'px-5 py-2.5' : size === 'lg' ? 'px-6 py-[14px]' : 'px-6 py-3';
   return (
     <button
       type="button"
-      className={`group relative inline-flex items-center justify-center overflow-hidden rounded-full text-base font-medium tracking-tightish transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-base disabled:cursor-not-allowed disabled:opacity-60 ${styles} ${pad} ${className}`}
+      className={`group relative inline-flex items-center justify-center overflow-hidden rounded-full text-base font-medium tracking-tightish transition-[color,border-color,transform] duration-500 ease-silk active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-base disabled:cursor-not-allowed disabled:opacity-60 ${styles} ${pad} ${className}`}
+      onPointerEnter={(e) => {
+        moveFill(e, fillRef.current, true);
+        onPointerEnter?.(e);
+      }}
+      onPointerLeave={(e) => {
+        moveFill(e, fillRef.current, false);
+        onPointerLeave?.(e);
+      }}
       {...rest}
     >
+      <span
+        ref={fillRef}
+        aria-hidden="true"
+        className={`pointer-events-none absolute left-0 top-0 rounded-full transition-transform duration-[650ms] ease-silk ${fill}`}
+        style={{ transform: 'scale(0)' }}
+      />
       <span className="relative block overflow-hidden leading-[1.3]">
         <span className="flex items-center justify-center gap-2 transition-transform duration-500 ease-[cubic-bezier(.2,.8,.2,1)] group-hover:-translate-y-full">
           {children}
